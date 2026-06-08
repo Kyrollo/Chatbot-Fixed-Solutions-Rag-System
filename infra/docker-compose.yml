@@ -73,8 +73,8 @@ services:
       - "80:80"
       - "8080:8080"
     volumes:
-      - ./services/gateway/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./services/gateway/traefik/dynamic:/etc/traefik/dynamic:ro
+      - ../services/gateway/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ../services/gateway/traefik/dynamic:/etc/traefik/dynamic:ro
     networks:
       - rag-network
 
