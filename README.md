@@ -516,78 +516,78 @@ python run_services.py --skip-infra    # skip Redis/Keycloak if already running
 ```mermaid
 erDiagram
     users {
-        VARCHAR id PK
-        VARCHAR name
-        VARCHAR role
+        varchar id PK
+        varchar name
+        varchar role
     }
 
     domains {
-        UUID id PK
-        VARCHAR name UK
-        TEXT description
-        ENUM status
-        VARCHAR created_by
-        TIMESTAMPTZ created_at
-        TIMESTAMPTZ updated_at
+        uuid id PK
+        varchar name UK
+        text description
+        varchar status
+        varchar created_by
+        timestamp created_at
+        timestamp updated_at
     }
 
     domain_configs {
-        UUID id PK
-        UUID domain_id FK
-        VARCHAR llm_route
-        INTEGER chunk_size
-        INTEGER chunk_overlap
-        FLOAT confidence_threshold
-        JSONB extra_settings
-        TIMESTAMPTZ updated_at
+        uuid id PK
+        uuid domain_id FK
+        varchar llm_route
+        int chunk_size
+        int chunk_overlap
+        float confidence_threshold
+        json extra_settings
+        timestamp updated_at
     }
 
     domain_roles {
-        UUID id PK
-        UUID domain_id FK
-        VARCHAR user_id
-        ENUM role
-        VARCHAR assigned_by
-        TIMESTAMPTZ assigned_at
+        uuid id PK
+        uuid domain_id FK
+        varchar user_id
+        varchar role
+        varchar assigned_by
+        timestamp assigned_at
     }
 
     documents {
-        VARCHAR id PK
-        VARCHAR domain_id
-        VARCHAR user_id
-        VARCHAR filename
-        VARCHAR file_path
-        VARCHAR status
-        TEXT error_msg
-        TIMESTAMP created_at
+        varchar id PK
+        varchar domain_id
+        varchar user_id
+        varchar filename
+        varchar file_path
+        varchar status
+        text error_msg
+        timestamp created_at
     }
 
     document_chunks {
-        TEXT id PK
-        TEXT document_id
-        TEXT domain_id
-        INTEGER page_num
-        INTEGER chunk_index
-        TEXT text
-        TSVECTOR search_vec
-        TIMESTAMPTZ created_at
+        text id PK
+        text document_id
+        text domain_id
+        int page_num
+        int chunk_index
+        text content
+        text search_vec
+        timestamp created_at
     }
 
     rag_query_logs {
-        BIGSERIAL id PK
-        TEXT domain_id
-        TEXT user_id
-        TEXT query
-        TEXT answer
-        TEXT llm_route
-        TEXT model
-        TIMESTAMPTZ created_at
+        bigint id PK
+        text domain_id
+        text user_id
+        text query
+        text answer
+        text llm_route
+        text model
+        timestamp created_at
     }
 
-    domains ||--|| domain_configs : "has config"
-    domains ||--o{ domain_roles : "has members"
+    domains ||--|| domain_configs : "has-config"
+    domains ||--o{ domain_roles : "has-members"
     domains ||--o{ documents : "contains"
-    documents ||--o{ document_chunks : "split into"
+    documents ||--o{ document_chunks : "split-into"
 ```
 
 ### Table Details
