@@ -883,8 +883,10 @@ python -m venv .venv
 # Activate the virtual environment
 .venv\Scripts\activate
 
+pip install -U pip setuptools wheel
+
 # Install all required Python packages (includes ML models & extractors)
-.venv\Scripts\pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 > [!NOTE]
 > Installing dependencies may take 10–20 minutes as it downloads PyTorch CPU and ML inference libraries (approx. 2 GB total).
