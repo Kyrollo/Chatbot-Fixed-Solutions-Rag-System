@@ -15,14 +15,15 @@ A complete backend + frontend stack for domain management, document ingestion, h
 5. [Services Reference](#5-services-reference)
 6. [Database Schema](#6-database-schema)
 7. [Retrieval Pipeline](#7-retrieval-pipeline)
-8. [Authentication & RBAC](#8-authentication--rbac)
-9. [API Reference](#9-api-reference)
-10. [Prerequisites](#10-prerequisites)
-11. [Complete From-Scratch Setup & Run Guide](#11-complete-from-scratch-setup--run-guide)
-12. [Environment Variables](#12-environment-variables)
-13. [Troubleshooting](#13-troubleshooting)
-14. [Directory Layout](#14-directory-layout)
-15. [Quick Reference Card](#15-quick-reference-card)
+8. [OCR Pipeline](#8-ocr-pipeline)
+9. [Authentication & RBAC](#9-authentication--rbac)
+10. [API Reference](#10-api-reference)
+11. [Prerequisites](#11-prerequisites)
+12. [Complete From-Scratch Setup & Run Guide](#12-complete-from-scratch-setup--run-guide)
+13. [Environment Variables](#13-environment-variables)
+14. [Troubleshooting](#14-troubleshooting)
+15. [Directory Layout](#15-directory-layout)
+16. [Quick Reference Card](#16-quick-reference-card)
 
 ---
 
@@ -61,7 +62,7 @@ A user uploads a document (PDF, DOCX, CSV, or image) to a domain. Here's what ha
 2. It creates a `documents` record in PostgreSQL (status = `pending`)
 3. It enqueues an async job into **Redis** (Celery task queue)
 4. **`worker-service`** picks up the job and:
-   - **Extracts text** using a format-specific extractor: PyMuPDF for PDFs (+ Tesseract OCR for scanned pages), python-docx for DOCX files, pandas for CSVs, or Tesseract OCR for standalone images
+   - **Extracts text** using a format-specific extractor: PyMuPDF for PDFs with native text layers, python-docx for DOCX files, pandas for CSVs. For **scanned PDF pages and standalone images**, text is extracted via the embedded **OCR pipeline** — a PaddleOCR fast path with automatic Surya fallback for low-confidence results (see [Section 8: OCR Pipeline](#8-ocr-pipeline))
    - **Splits the text into chunks** using semantic chunking with embedding similarity (topic-boundary detection)
    - **Generates embedding vectors** for each chunk using the `intfloat/multilingual-e5-small` model (384-dimensional vectors). Each chunk is prefixed with `passage:` as required by the E5 model.
    - **Stores vectors in Qdrant** — one collection per domain, each point contains the chunk text, document ID, page number, chunk index, filename, and source type
@@ -95,10 +96,11 @@ A user asks a question. Here's the full pipeline:
 | Role-based access (RBAC) | Three-layer security: Keycloak JWT tokens at the gateway + per-domain role checks in each service including retrieval |
 | Hybrid retrieval | Combines dense vector search (semantic meaning) + sparse BM25 search (exact keywords) + cross-encoder reranking for highest accuracy |
 | AI answer generation | Groq (cloud, fast, free tier) or Ollama (local, offline). Per-domain LLM routing — some domains can use cloud, others local. |
-| Multi-format ingestion | Supports PDF, DOCX, CSV, and image (PNG/JPG) uploads. Format-specific extractors with OCR fallback for scanned content. |
+| Multi-format ingestion | Supports PDF, DOCX, CSV, and image (PNG/JPG) uploads. Format-specific extractors with a PaddleOCR + Surya OCR pipeline for scanned content. |
 | Async document processing | Documents are processed in background via Celery + Redis. The user gets immediate `202 Accepted` and can poll status. |
 | Intelligent caching | Redis caches both retrieval results and generated answers. Identical repeat queries return instantly. |
 | Citation grounding | Every AI answer includes citations with document filename, source type, page/row number, and relevance score |
+| Multi-language OCR | Scanned pages and images are OCR'd via PaddleOCR/Surya with configurable language models (`OCR_LANG` / `OCR_LANGS`), not limited to a single language |
 | Graceful degradation | If Redis is down → uses in-memory cache. If Groq is down → falls back to Ollama. If Keycloak is down → uses dev auth. |
 | React chat UI | Full-featured web interface for login, domain management, document upload, and interactive Q&A |
 
@@ -263,7 +265,7 @@ flowchart TD
     3.  It registers the document in **PostgreSQL** with a `pending` status and publishes a processing task to **Redis**.
     4.  The client receives an immediate `202 Accepted` response with the `document_id` to poll for completion.
     5.  The background **`worker-service`** (Celery worker running on a solo pool) picks up the task from Redis.
-    6.  It extracts raw text using format-specific extractors (PyMuPDF with Tesseract OCR fallback for PDFs, python-docx for DOCX, pandas for CSV, or Tesseract OCR for images).
+    6.  It extracts raw text using format-specific extractors: PyMuPDF for PDF pages with a native text layer, python-docx for DOCX, pandas for CSV. Scanned PDF pages and standalone images go through the **OCR pipeline** (PaddleOCR with Surya fallback — see [Section 8](#8-ocr-pipeline)).
     7.  The text is split into semantic paragraphs, and each chunk is embedded using the E5 transformer model.
     8.  The worker writes vectors and provenance metadata into **Qdrant** and stores full-text search indexes in **PostgreSQL**.
     9.  The document status is updated to `done` (or `failed` with populated error logs if processing fails).
@@ -360,6 +362,10 @@ All project documentation consolidated into `README.md` (this file) and `databas
 
 `run_services.py` adds `scripts/` to `PYTHONPATH` so services can import shared modules.
 
+### Decision 10: OCR Is a PaddleOCR + Surya Ensemble, Not Tesseract
+
+Scanned pages and image uploads are handled by an embedded OCR pipeline (`ocr_service/`, used by `worker-service/tasks/extract.py`) instead of Tesseract. PaddleOCR runs first as a fast path; if its confidence score falls below a threshold, Surya (a transformer-based, layout-aware OCR model) runs as a fallback and the higher-scoring result is kept. This keeps average latency low while improving accuracy on low-quality or mixed-language scans. See [Section 8: OCR Pipeline](#8-ocr-pipeline) for full details.
+
 ---
 
 ## 4. Technology Stack
@@ -379,10 +385,12 @@ All project documentation consolidated into `README.md` (this file) and `databas
 | Reranker | `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` | — | Cross-encoder reranking |
 | Cloud LLM | Groq | — | `llama-3.3-70b-versatile` |
 | Local LLM | Ollama | — | `llama3.2:3b` (offline fallback) |
-| PDF extraction | PyMuPDF + Tesseract | 1.25.2 | Text + OCR for scanned pages |
+| PDF extraction | PyMuPDF | — | Native text extraction for digital PDF pages |
+| OCR (fast path) | PaddleOCR | — | Primary OCR engine for scanned pages and images, multi-language via `OCR_LANG`/`OCR_LANGS` |
+| OCR (fallback) | Surya | — | Layout-aware transformer OCR, used when PaddleOCR confidence is below threshold |
 | DOCX extraction | python-docx | 1.1.2 | Word document text extraction |
 | CSV extraction | pandas | 2.2.3 | Tabular data text extraction |
-| ML runtime | PyTorch CPU | 2.6.0 | Embedding model inference |
+| ML runtime | PyTorch CPU | 2.6.0+ | Embedding model and Surya inference |
 
 ---
 
@@ -399,7 +407,7 @@ All project documentation consolidated into `README.md` (this file) and `databas
 | Qdrant | — | Vector database | Dense embedding search (embedded, no server) |
 | domain-service | 8001 | FastAPI | Domain CRUD, members, config, RBAC |
 | ingestion-service | 8002 | FastAPI | PDF upload, job enqueue, status polling |
-| worker-service | — | Celery worker | PDF extract → chunk → embed → index |
+| worker-service | — | Celery worker | Extract (incl. OCR) → chunk → embed → index |
 | retrieval-service | 8003 | FastAPI | Hybrid search pipeline |
 | generation-service | 8004 | FastAPI | RAG orchestration and LLM answers |
 | evaluation-service | 8005 | FastAPI | LLM-as-judge scoring (optional) |
@@ -434,10 +442,10 @@ All project documentation consolidated into `README.md` (this file) and `databas
 
 #### 🟪 worker-service (Celery Worker) — The Document Processor
 
-**What it does:** Runs in the background as a Celery worker. Picks up ingestion jobs from Redis and does the heavy lifting: text extraction, chunking, embedding, and indexing.
+**What it does:** Runs in the background as a Celery worker. Picks up ingestion jobs from Redis and does the heavy lifting: text extraction (including OCR), chunking, embedding, and indexing.
 
 **How it works internally (step by step):**
-1. **Text extraction:** Uses PyMuPDF (`fitz`) to extract text from PDF pages. For scanned/image PDFs, falls back to Tesseract OCR.
+1. **Text extraction:** Uses PyMuPDF (`fitz`) to extract text from PDF pages with a native text layer. For scanned/image-only PDF pages and for standalone image uploads (PNG/JPG/JPEG), text is extracted via the embedded **OCR pipeline** — PaddleOCR first, with an automatic Surya fallback for low-confidence pages. See [Section 8: OCR Pipeline](#8-ocr-pipeline).
 2. **Semantic chunking:** Splits extracted text into chunks of ~512 characters (configurable per domain) with 64-character overlap. The overlap ensures sentences aren't cut in half at chunk boundaries.
 3. **Embedding generation:** Runs each chunk through the `intfloat/multilingual-e5-small` model (384-dimensional vectors). Each chunk is prefixed with `passage:` as required by the E5 model architecture.
 4. **Vector indexing (Qdrant):** Stores embeddings in Qdrant with payloads containing the chunk text, document ID, page number, and chunk index. Each domain gets its own Qdrant collection (named by domain ID).
@@ -446,7 +454,7 @@ All project documentation consolidated into `README.md` (this file) and `databas
 
 **Important:** On Windows, Celery runs with `--pool=solo` (no fork support). This means one job at a time, but it's reliable.
 
-**Key files:** `tasks/index.py` (the main ingestion task), `celery_app.py` (Celery configuration).
+**Key files:** `tasks/extract.py` (text + OCR extraction routing), `tasks/index.py` (the main ingestion task), `celery_app.py` (Celery configuration), `tasks/ocr-service/ocr_service/` (OCR pipeline — see [Section 8](#8-ocr-pipeline)).
 
 #### 🟩 retrieval-service (Port 8003) — The Search Engine
 
@@ -539,7 +547,7 @@ All project documentation consolidated into `README.md` (this file) and `databas
 6. **Starts ingestion-service** — launches Uvicorn on port 8002 (waits between launches to avoid memory contention)
 7. **Starts retrieval-service** — launches Uvicorn on port 8003
 8. **Starts generation-service** — launches Uvicorn on port 8004
-9. **Starts worker-service** — Celery worker (only if `--worker` flag is used)
+9. **Starts worker-service** — Celery worker (only if `--worker` flag is used). This is the process that loads PaddleOCR and Surya (see [Section 8](#8-ocr-pipeline)).
 10. **Monitors all processes** — if any service crashes, logs the error and keeps running
 
 The staggered startup and memory management are critical on Windows to avoid DLL collisions and paging file exhaustion.
@@ -555,7 +563,7 @@ python run_services.py --skip-infra    # skip Redis/Keycloak if already running
 ```
 
 > If Redis is not running: uses in-memory cache and sync PDF ingestion.
-> If Redis is running + `--worker`: starts Celery worker for async ingestion.
+> If Redis is running + `--worker`: starts Celery worker for async ingestion, and OCR (PaddleOCR/Surya) is available.
 
 ---
 
@@ -653,7 +661,7 @@ erDiagram
 | `document_chunks` | Searchable text segments | `source_type` (pdf/docx/csv/png), `search_vec` (TSVECTOR for BM25), GIN index |
 | `rag_query_logs` | Query audit trail | `query`, `answer`, `llm_route`, `model` |
 
-> For the complete database schema and seed data, see the initialization script [migrations/init_db.sql](file:///d:/Personal/Fixed%20Solutions/Project%20Files/Main/migrations/init_db.sql) and the instructions in [Section 11](#11-complete-from-scratch-setup--run-guide).
+> For the complete database schema and seed data, see the initialization script [migrations/init_db.sql](file:///d:/Personal/Fixed%20Solutions/Project%20Files/Main/migrations/init_db.sql) and the instructions in [Section 12](#12-complete-from-scratch-setup--run-guide).
 
 ---
 
@@ -697,7 +705,89 @@ flowchart LR
 
 ---
 
-## 8. Authentication & RBAC
+## 8. OCR Pipeline
+
+Scanned PDF pages and standalone image uploads (PNG/JPG/JPEG) don't have a native text layer, so they're routed through an embedded **OCR pipeline** before chunking. The pipeline lives under `services/worker-service/tasks/ocr-service/ocr_service/` and is consumed by `tasks/extract.py` (and its drop-in variant `tasks/extract_with_ocr.py`).
+
+### 8.1 Routing Overview
+
+```mermaid
+flowchart TD
+    F["File arrives at worker\n(PDF / DOCX / CSV / Image)"]
+    EXT["tasks/extract.py"]
+    DOCX["DOCX -> python-docx"]
+    CSV["CSV -> pandas"]
+    NATIVE{"Native text layer?\n(PyMuPDF)"}
+    DIRECT["Use native text directly"]
+    PRE["Preprocessing\nDenoise -> Deskew -> Adaptive Resize"]
+    PADDLE["PaddleOCR\n(fast path, multi-language)"]
+    PSCORE{"Paddle score >= threshold?\n(default 0.85)"}
+    EXIT["Early exit: use Paddle result"]
+    SURYA["Surya OCR\n(transformer fallback)"]
+    PICK["Pick higher-scoring result"]
+    OUT["{page, text, model_used,\nconfidence_score, ...}"]
+    CHUNK["chunk.py -> embed.py -> index.py"]
+
+    F --> EXT
+    EXT --> DOCX
+    EXT --> CSV
+    EXT --> NATIVE
+    NATIVE -->|Yes| DIRECT
+    NATIVE -->|No| PRE
+    PRE --> PADDLE
+    PADDLE --> PSCORE
+    PSCORE -->|Yes| EXIT
+    PSCORE -->|No| SURYA
+    SURYA --> PICK
+    EXIT --> OUT
+    PICK --> OUT
+    DIRECT --> OUT
+    DOCX --> OUT
+    CSV --> OUT
+    OUT --> CHUNK
+
+    style PADDLE fill:#24b47e,color:#fff
+    style SURYA fill:#7c3aed,color:#fff
+    style PRE fill:#f59e0b,color:#000
+```
+
+### 8.2 Stages
+
+| Stage | Component | What it does |
+|---|---|---|
+| 1. Format routing | `tasks/extract.py` | `.docx` → python-docx, `.csv` → pandas, `.pdf`/`.png`/`.jpg`/`.jpeg` → checked for native text first |
+| 2. Native text check | PyMuPDF (`fitz`) | Each PDF page's text layer is checked. If text exists, it's used directly — no OCR, no model overhead |
+| 3. Preprocessing | `ocr_service/preprocessing/image_processor.py` | For pages/images with no native text: denoise (`fastNlMeansDenoisingColored`), deskew (Hough line transform, ±15° correction), adaptive resize (upscale below 1000px, downscale above 4096px) |
+| 4. Fast OCR path | `ocr_service/engines/paddle_engine.py` (PaddleOCR) | Runs first on every page. Loaded once per language as a singleton and reused across requests |
+| 5. Confidence scoring | `ocr_service/scoring/ocr_scorer.py` | PaddleOCR score = `0.7 × avg_confidence + 0.3 × valid_word_ratio`. Surya score = weighted blend of text density, language consistency, and noise penalty |
+| 6. Routing decision | `ocr_service/routing/ocr_router.py` | If PaddleOCR score ≥ `OCR_CONFIDENCE_THRESHOLD` (default `0.85`), return immediately. Otherwise run Surya and keep whichever result scores higher |
+| 7. Fallback OCR | `ocr_service/engines/surya_engine.py` (Surya) | Layout-aware transformer OCR, used only when PaddleOCR is below threshold — keeps average latency low while catching low-quality scans |
+| 8. Output | `ocr_service/pipeline.py` | Returns `{"page": N, "text": ..., "model_used": "paddle"|"surya", "confidence_score": ..., "processing_time_ms": ...}` per page, which feeds into chunking exactly like native-text pages |
+
+### 8.3 Multi-Language Support
+
+OCR language is configurable via environment variables (read by `paddle_engine.py`):
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `OCR_LANG` | Single-language mode — PaddleOCR loads one language model | `en` |
+| `OCR_LANGS` | Comma-separated list (e.g. `ar,en`) — PaddleOCR runs once per language and keeps the result with the highest average confidence | unset (single-language mode) |
+
+`OCR_LANGS` takes precedence over `OCR_LANG` when set. Each language's PaddleOCR pipeline is loaded once and cached as a singleton (under `~/.paddlex/official_models/` on first run), so subsequent pages don't re-download or re-initialize models. Using more languages in `OCR_LANGS` means one extra OCR pass per image per language — keep the list to 2-3 languages you actually expect in your documents.
+
+### 8.4 Platform Notes (Windows CPU)
+
+PaddleOCR on Windows CPU requires a couple of non-obvious settings to run reliably with `paddlepaddle==3.3.1` / `paddleocr>=3.7.0`:
+
+- **`enable_mkldnn=False`** — avoids a oneDNN/PIR crash (`NotImplementedError: ConvertPirAttribute2RuntimeAttribute ... pir::ArrayAttribute<DoubleAttribute>`) that occurs on the first `predict()` call with mkldnn enabled on this build.
+- **`text_detection_model_name="PP-OCRv5_mobile_det"`** — the default server detection model causes a native access violation (process exit code `0xC0000005`) when mkldnn is disabled; the mobile detection model avoids this and is also faster on CPU.
+- The **Microsoft Visual C++ Redistributable** (latest x64) must be installed for `paddlepaddle`'s and `torch`'s native extensions (`libpaddle.pyd`, `shm.dll`) to load correctly.
+
+These are already applied in `ocr_service/engines/paddle_engine.py` — listed here for anyone debugging a fresh Windows setup.
+
+---
+
+## 9. Authentication & RBAC
 
 ### Two Layers of Security
 
@@ -751,11 +841,11 @@ When Keycloak is not running, `run_services.py` automatically uses `scripts/dev_
 
 ---
 
-## 9. API Reference
+## 10. API Reference
 
 All requests through the API gateway require: `Authorization: Bearer <JWT_ACCESS_TOKEN>`
 
-### 9.1 domain-service (port 8001)
+### 10.1 domain-service (port 8001)
 
 | Method | Path | Who | Description |
 |---|---|---|---|
@@ -768,7 +858,7 @@ All requests through the API gateway require: `Authorization: Bearer <JWT_ACCESS
 | POST | `/internal/check-access` | Internal only | Verify user access (X-Internal-Key) |
 | GET | `/health` | Public | Health check |
 
-### 9.2 ingestion-service (port 8002)
+### 10.2 ingestion-service (port 8002)
 
 | Method | Path | Who | Description |
 |---|---|---|---|
@@ -778,14 +868,14 @@ All requests through the API gateway require: `Authorization: Bearer <JWT_ACCESS
 
 **Ingestion statuses:** `pending` → `processing` → `done` or `failed`
 
-### 9.3 retrieval-service (port 8003)
+### 10.3 retrieval-service (port 8003)
 
 | Method | Path | Who | Description |
 |---|---|---|---|
 | POST | `/api/v1/retrieve` | `reader`+ (RBAC enforced) | Hybrid retrieval (query + domain_id). Requires Bearer JWT; verifies domain access. |
 | GET | `/health` | Public | Health check |
 
-### 9.4 generation-service (port 8004)
+### 10.4 generation-service (port 8004)
 
 | Method | Path | Who | Description |
 |---|---|---|---|
@@ -813,7 +903,7 @@ All requests through the API gateway require: `Authorization: Bearer <JWT_ACCESS
 }
 ```
 
-### 9.5 evaluation-service (port 8005, optional)
+### 10.5 evaluation-service (port 8005, optional)
 
 | Method | Path | Who | Description |
 |---|---|---|---|
@@ -831,7 +921,7 @@ All requests through the API gateway require: `Authorization: Bearer <JWT_ACCESS
 
 ---
 
-## 10. Prerequisites
+## 11. Prerequisites
 
 ### Required
 
@@ -841,16 +931,18 @@ All requests through the API gateway require: `Authorization: Bearer <JWT_ACCESS
 | **PostgreSQL** | 16 | [Download](https://www.postgresql.org/download/windows/). Keep default port 5432. |
 | **Java** | 17+ | [Adoptium Temurin](https://adoptium.net/). Required for Keycloak. |
 | **Groq API key** | Free tier | [Get one](https://console.groq.com). Primary LLM provider. |
-| **RAM** | 8 GB min, 16 GB recommended | Embedding and reranking models load into memory |
-| **Disk** | ~10 GB free | ML model caches + infra downloads |
+| **Microsoft Visual C++ Redistributable** | Latest x64 | [Download](https://aka.ms/vs/17/release/vc_redist.x64.exe). Required for PaddleOCR/PyTorch native extensions on Windows. |
+| **RAM** | 8 GB min, 16 GB recommended | Embedding, reranking, PaddleOCR, and Surya models load into memory |
+| **Disk** | ~10 GB free | ML model caches (incl. OCR models) + infra downloads |
 
-### Auto-Downloaded (by `run_services.py`)
+### Auto-Downloaded (by `run_services.py` / on first OCR run)
 
 | Component | Port | Notes |
 |---|---|---|
 | **Redis** | 6379 | Portable Redis for Windows, downloaded to `tools/redis/` |
 | **Keycloak** | 8180 | Downloaded to `tools/keycloak/` on first run (~150 MB) |
 | **Qdrant** | — | Embedded at `data/qdrant` automatically (no server needed) |
+| **PaddleOCR / Surya models** | — | Downloaded to `~/.paddlex/official_models/` on first OCR call per language (small "mobile" models, a few MB to tens of MB each) |
 
 ### Optional
 
@@ -858,17 +950,16 @@ All requests through the API gateway require: `Authorization: Bearer <JWT_ACCESS
 |---|---|
 | **Node.js + npm** | React frontend (`rag-ui/`) |
 | **Ollama** | Local/offline LLM fallback when Groq is unavailable |
-| **Tesseract OCR** | Better OCR for scanned PDFs |
 
 ---
 
-## 11. Complete From-Scratch Setup & Run Guide
+## 12. Complete From-Scratch Setup & Run Guide
 
 Follow this guide to set up the complete system (databases, identity provider, message queues, backend services, and frontend UI) from scratch on a new machine.
 
 ---
 
-### 11.1 Python Environment Setup
+### 12.1 Python Environment Setup
 
 The backend microservices and worker are written in Python.
 
@@ -883,15 +974,17 @@ python -m venv .venv
 # Activate the virtual environment
 .venv\Scripts\activate
 
+pip install -U pip setuptools wheel
+
 # Install all required Python packages (includes ML models & extractors)
-.venv\Scripts\pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 > [!NOTE]
-> Installing dependencies may take 10–20 minutes as it downloads PyTorch CPU and ML inference libraries (approx. 2 GB total).
+> Installing dependencies may take 10–20 minutes as it downloads PyTorch CPU, PaddleOCR/PaddlePaddle, Surya, and other ML inference libraries (approx. 2-3 GB total).
 
 ---
 
-### 11.2 Environment Configuration
+### 12.2 Environment Configuration
 
 All services read from a single, shared configuration file at the project root.
 
@@ -903,12 +996,13 @@ copy .env.example .env
 ```
 
 2. **Edit the `.env` file** and configure the following required parameters:
-   - `POSTGRES_PASSWORD`: Change this to the password you choose for PostgreSQL (see step 11.3).
+   - `POSTGRES_PASSWORD`: Change this to the password you choose for PostgreSQL (see step 12.3).
    - `GROQ_API_KEY`: Provide a valid Groq API key from [console.groq.com](https://console.groq.com).
+   - `OCR_LANG` / `OCR_LANGS` (optional): set the language(s) PaddleOCR should use for scanned pages/images — see [Section 8.3](#83-multi-language-support).
 
 ---
 
-### 11.3 PostgreSQL Installation & Database Generation
+### 12.3 PostgreSQL Installation & Database Generation
 
 PostgreSQL stores domains, user lists, configurations, upload logs, text chunks (with search vectors), and query audit trails.
 
@@ -975,7 +1069,7 @@ psql -U postgres -d domain_db -f migrations/sprint2_migration.sql
 
 ---
 
-### 11.4 Java & Keycloak Identity Setup
+### 12.4 Java & Keycloak Identity Setup
 
 Keycloak serves as the central identity provider to enforce Role-Based Access Control (RBAC).
 
@@ -1032,7 +1126,7 @@ To add additional test accounts (e.g., manager, contributor), use the Keycloak A
 
 ---
 
-### 11.5 Redis Setup
+### 12.5 Redis Setup
 
 Redis works as the asynchronous task message broker (Celery) and caching layer.
 
@@ -1043,13 +1137,13 @@ Redis works as the asynchronous task message broker (Celery) and caching layer.
 
 ---
 
-### 11.6 Qdrant Vector Database
+### 12.6 Qdrant Vector Database
 
 No manual setup is required. Qdrant runs in embedded mode inside the Python processes. Vector embeddings and collections are stored as binary files in the `data/qdrant/` folder.
 
 ---
 
-### 11.7 React Frontend Setup
+### 12.7 React Frontend Setup
 
 The frontend provides an interactive chat interface to ask questions, view citations, manage domains, and upload documents.
 
@@ -1063,7 +1157,7 @@ Navigate to **http://localhost:5173** to access the UI. You can sign in using `a
 
 ---
 
-### 11.8 Launching the Backend Microservices
+### 12.8 Launching the Backend Microservices
 
 Launch all services plus the background Celery ingestion worker simultaneously:
 
@@ -1073,13 +1167,15 @@ Launch all services plus the background Celery ingestion worker simultaneously:
 python run_services.py --worker
 ```
 
+> The `--worker` flag is required for OCR — PaddleOCR and Surya are loaded inside the worker process. The first OCR call per language downloads its model (cached afterward under `~/.paddlex/official_models/`).
+
 ---
 
-### 11.9 End-to-End System Verification
+### 12.9 End-to-End System Verification
 
 Once everything is running, verify system functionality:
 
-#### 1. Ingestion File validation (DOCX/CSV/PDF)
+#### 1. Ingestion File validation (DOCX/CSV/PDF/Image)
 Obtain an access token and test document upload:
 
 🟦 **Run in PowerShell:**
@@ -1090,9 +1186,14 @@ $token = (Invoke-RestMethod -Uri http://localhost:8001/domains/auth/login -Metho
 # Upload a valid DOCX file (Should return 202 Accepted)
 curl.exe -X POST http://localhost:8002/ingest -H "Authorization: Bearer $token" -F "file=@test.docx" -F "domain_id=11111111-1111-1111-1111-111111111111"
 
+# Upload a scanned PDF or image to exercise the OCR pipeline (Should return 202 Accepted)
+curl.exe -X POST http://localhost:8002/ingest -H "Authorization: Bearer $token" -F "file=@scanned_document.pdf" -F "domain_id=11111111-1111-1111-1111-111111111111"
+
 # Upload an invalid file type (Should return 400 Bad Request)
 curl.exe -X POST http://localhost:8002/ingest -H "Authorization: Bearer $token" -F "file=@test.exe" -F "domain_id=11111111-1111-1111-1111-111111111111"
 ```
+
+After uploading the scanned PDF, poll `GET /ingest/{document_id}` until `status` is `done`. The worker log will show which OCR engine was used per page (`model_used=paddle` or `model_used=surya`) and its `confidence_score`.
 
 #### 2. Querying & Citations
 Verify that questions return answers with full metadata:
@@ -1117,7 +1218,7 @@ curl.exe -X POST http://localhost:8003/api/v1/retrieve -H "Authorization: Bearer
 
 ---
 
-## 12. Environment Variables
+## 13. Environment Variables
 
 All services read from a single root `.env` file. Copy `.env.example` to `.env` and edit.
 
@@ -1151,12 +1252,15 @@ All services read from a single root `.env` file. Copy `.env.example` to `.env` 
 | `CACHE_TTL_SECONDS` | Redis cache TTL | `3600` |
 | `UPLOAD_DIR` | PDF storage path | `data/uploads` |
 | `MAX_SIZE_MB` | Max upload size | `50` |
+| `OCR_LANG` | Single-language PaddleOCR model | `en` |
+| `OCR_LANGS` | Comma-separated languages (e.g. `ar,en`) — overrides `OCR_LANG`, picks best-confidence result per page | unset |
+| `OCR_CONFIDENCE_THRESHOLD` | PaddleOCR score above which Surya fallback is skipped | `0.85` |
 
 > See `.env.example` for inline comments explaining where to get each value.
 
 ---
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 ### PostgreSQL — connection refused
 
@@ -1203,6 +1307,24 @@ First retrieval-service start downloads ~500 MB of embedding models — be patie
 - Check Celery worker is running (started with `python run_services.py --worker`)
 - On Windows, Celery uses `--pool=solo` (required — no fork support)
 - Ensure `PYTHONIOENCODING=utf-8` is set (handled by launcher)
+- For scanned PDFs/images, the first page can take longer the first time per language as PaddleOCR/Surya models download and load — check the worker log for `Loading PaddleOCR...` / `Loading Surya OCR models...`
+
+### OCR — `DLL load failed while importing libpaddle` (Windows)
+
+- Install the latest **Microsoft Visual C++ Redistributable (x64)**: https://aka.ms/vs/17/release/vc_redist.x64.exe
+- Restart your terminal (or reboot) after installing, then retry `python run_services.py --worker`
+
+### OCR — `NotImplementedError: ConvertPirAttribute2RuntimeAttribute ... pir::ArrayAttribute<DoubleAttribute>`
+
+Known `paddlepaddle==3.3.x` CPU issue with PP-OCRv5 models under oneDNN. Already worked around in `paddle_engine.py` via `enable_mkldnn=False`. If you see this, confirm you're on the version of `paddle_engine.py` that sets `enable_mkldnn=False`.
+
+### OCR — worker exits with code `3221225477` (0xC0000005, access violation)
+
+Caused by the default `PP-OCRv5_server_det` detection model when `enable_mkldnn=False`. Already worked around in `paddle_engine.py` via `text_detection_model_name="PP-OCRv5_mobile_det"`.
+
+### OCR — wrong language / poor accuracy on non-English documents
+
+Set `OCR_LANG=<code>` (e.g. `ar` for Arabic) or `OCR_LANGS=ar,en` for mixed-language documents — see [Section 8.3](#83-multi-language-support).
 
 ### Port already in use
 
@@ -1250,7 +1372,7 @@ Restart `run_services.py` to recreate clean tables.
 
 ---
 
-## 14. Directory Layout
+## 15. Directory Layout
 
 ```
 Chatbot-Fixed-Team2/
@@ -1291,12 +1413,26 @@ Chatbot-Fixed-Team2/
     ├── retrieval-service/            # port 8003 (+ RBAC filtering)
     ├── generation-service/           # port 8004
     ├── evaluation-service/           # port 8005 (optional)
-    └── worker-service/               # Celery worker (multi-format)
+    └── worker-service/               # Celery worker (multi-format + OCR)
+        └── tasks/
+            ├── extract.py            # format routing, calls OCR pipeline for scans/images
+            └── ocr-service/
+                └── ocr_service/
+                    ├── pipeline.py            # top-level OCR entry point
+                    ├── preprocessing/
+                    │   └── image_processor.py # denoise, deskew, resize
+                    ├── engines/
+                    │   ├── paddle_engine.py   # PaddleOCR (fast path, multi-language)
+                    │   └── surya_engine.py    # Surya (fallback)
+                    ├── scoring/
+                    │   └── ocr_scorer.py      # confidence scoring for both engines
+                    └── routing/
+                        └── ocr_router.py      # PaddleOCR -> Surya routing decision
 ```
 
 ---
 
-## 15. Quick Reference Card
+## 16. Quick Reference Card
 
 ```text
 Start:       python run_services.py
@@ -1312,9 +1448,13 @@ Token:       POST http://localhost:8180/realms/rag-system/protocol/openid-connec
 Typical flow:
   1. Get JWT token (Keycloak or dev auth)
   2. POST /domains                          → create domain
-  3. POST /ingest                           → upload PDF
-  4. GET  /ingest/{document_id}             → wait for "done"
+  3. POST /ingest                           → upload PDF / image
+  4. GET  /ingest/{document_id}             → wait for "done" (OCR runs here for scans/images)
   5. POST /generate/query                   → get AI answer with citations
+
+OCR config:
+  OCR_LANG=en           → single language (default)
+  OCR_LANGS=ar,en       → multi-language, picks best-confidence result per page
 ```
 
 ---
