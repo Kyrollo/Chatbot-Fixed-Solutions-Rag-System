@@ -84,6 +84,20 @@ paddleocr>=3.7.0
 # To use the latest surya-ocr 0.20.0, upgrade torch to 2.7.0 in both places
 surya-ocr==0.13.1
 
+# surya-ocr==0.13.1's own pyproject.toml requires transformers>=4.41.0,<5.0.0.
+# Nothing else in this file pinned transformers directly, so a later
+# `pip install -U transformers` (or a transitive pull from sentence-
+# transformers / another package) can silently land on a newer 4.5x/4.57.x
+# release, which breaks surya's SuryaOCRConfig with:
+#   KeyError: 'encoder'  (or, on some versions: AttributeError on pad_token_id)
+# raised deep inside transformers.configuration_utils.PretrainedConfig.
+# This is a KNOWN recurring issue, not a one-off: the surya project itself
+# has shipped hotfixes for transformers 4.56.0 compatibility before, and a
+# separate open issue on their repo reports the same class of break on
+# 4.57.6, fixed by downgrading to 4.57.3. surya 0.13.1 predates both of
+# those fixes, so pin narrower than surya's own (too permissive) range:
+transformers==4.46.3
+
 # -- Image processing -----------------------------------------------------------
 opencv-python-headless>=4.8.0
 
@@ -103,3 +117,6 @@ opencv-python-headless>=4.8.0
 grpcio>=1.71.0
 grpcio-tools==1.71.0
 protobuf>=5.26.1,<6.0.0
+
+
+onnxruntime>=1.18,<2.0
