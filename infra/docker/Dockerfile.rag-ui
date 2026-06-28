@@ -5,7 +5,7 @@
 #
 # Multi-stage build:
 #   Stage 1 (node:20-alpine) — npm ci + npm run build, produces static
-#     files in services/rag-ui/dist/
+#     files in rag-ui/dist/
 #   Stage 2 (nginx:alpine) — serves those static files, proxies /api/*
 #     to monolith-service inside the cluster
 #
@@ -30,10 +30,10 @@ WORKDIR /app
 
 # package-lock.json is present in the repo (confirmed) — npm ci is used
 # instead of npm install for a reproducible, lockfile-exact install.
-COPY services/rag-ui/package.json services/rag-ui/package-lock.json ./
+COPY rag-ui/package.json rag-ui/package-lock.json ./
 RUN npm ci
 
-COPY services/rag-ui/ ./
+COPY rag-ui/ ./
 RUN npm run build
 
 # --- Stage 2: serve ------------------------------------------------------------
