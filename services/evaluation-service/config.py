@@ -38,13 +38,13 @@ class Settings(BaseSettings):
     # DATABASE_URL → individual POSTGRES_* vars). db/queries.py reads these
     # directly from os.getenv() with the same fallback chain, but listing
     # them here documents what the service needs.
-    SYNC_DATABASE_URL: str = ""
-    DATABASE_URL: str = ""
+    SYNC_DATABASE_URL: str = "postgresql://postgres:55555@localhost:5434/domain_db"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:55555@localhost:5434/domain_db"
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_PASSWORD: str = "55555"
     POSTGRES_DB: str = "domain_db"
     POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", "5432"))
+    POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", "5434"))
 
     # ── Redis / Celery ───────────────────────────────────────────────────────
     REDIS_URL: str = f"redis://localhost:{os.getenv('REDIS_PORT', '6379')}/0"

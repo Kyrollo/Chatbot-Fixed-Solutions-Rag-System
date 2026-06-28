@@ -65,3 +65,8 @@ celerybeat-schedule*
 
 # Redis
 dump.rdb
+
+
+# Dev JWT key pair
+*.pem
+data/dev/

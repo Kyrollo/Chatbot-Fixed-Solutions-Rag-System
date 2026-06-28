@@ -71,9 +71,9 @@ def apply_local_env(env: dict[str, str], *, use_keycloak: bool, use_redis: bool)
     user     = out.get("POSTGRES_USER", "postgres")
     password = quote(out.get("POSTGRES_PASSWORD", "postgres"), safe="")
     db       = out.get("POSTGRES_DB", "domain_db")
-    pg_port  = out.get("POSTGRES_PORT", "5432")
-    out.setdefault("DATABASE_URL", f"postgresql+asyncpg://{user}:{password}@localhost:{pg_port}/{db}")
-    out.setdefault("SYNC_DATABASE_URL", f"postgresql://{user}:{password}@localhost:{pg_port}/{db}")
+    pg_port  = out.get("POSTGRES_PORT", "5434")
+    out["DATABASE_URL"]      = f"postgresql+asyncpg://{user}:{password}@localhost:{pg_port}/{db}"
+    out["SYNC_DATABASE_URL"] = f"postgresql://{user}:{password}@localhost:{pg_port}/{db}"
 
     if use_redis:
         redis_port = out.get("REDIS_PORT", "6379")
@@ -86,15 +86,15 @@ def apply_local_env(env: dict[str, str], *, use_keycloak: bool, use_redis: bool)
     out["QDRANT_PATH"] = str(ROOT / "data" / "qdrant")
     out.pop("QDRANT_URL", None)
 
-    # ── Apache AGE (graph DB — WSL2 on port 5433) ──
+    # ── Apache AGE (graph DB — WSL2 on port 5434) ──
     out.setdefault("AGE_DATABASE_DSN", "")
     out.setdefault("AGE_GRAPH_NAME", "rag_graph")
 
-    out["DOMAIN_SERVICE_URL"]     = "http://localhost:8000"
-    out["INGESTION_SERVICE_URL"]  = "http://localhost:8000"
-    out["RETRIEVAL_SERVICE_URL"]  = "http://localhost:8000"
-    out["GENERATION_SERVICE_URL"] = "http://localhost:8000"
-    out["EVALUATION_SERVICE_URL"] = "http://localhost:8000"
+    out["DOMAIN_SERVICE_URL"]     = "https://localhost:8000"
+    out["INGESTION_SERVICE_URL"]  = "https://localhost:8000"
+    out["RETRIEVAL_SERVICE_URL"]  = "https://localhost:8000"
+    out["GENERATION_SERVICE_URL"] = "https://localhost:8000"
+    out["EVALUATION_SERVICE_URL"] = "https://localhost:8000"
     out["OCR_SERVICE_URL"]        = "http://localhost:8006"
     out["UPLOAD_DIR"]             = str(ROOT / "data" / "uploads")
     out.setdefault("OLLAMA_BASE_URL", "http://localhost:11434/v1")
@@ -106,8 +106,8 @@ def apply_local_env(env: dict[str, str], *, use_keycloak: bool, use_redis: bool)
 
     if use_keycloak:
         kc_port = out.get("KEYCLOAK_PORT", "8180")
-        out["KEYCLOAK_ISSUER"]      = f"http://localhost:{kc_port}/realms/rag-system"
-        out["KEYCLOAK_REALM_URL"]   = f"http://localhost:{kc_port}/realms/rag-system"
+        out["KEYCLOAK_ISSUER"]      = f"https://localhost:8443/realms/rag-system"
+        out["KEYCLOAK_REALM_URL"]   = f"https://localhost:8443/realms/rag-system"
         out["KEYCLOAK_PUBLIC_KEY"]  = ""
     else:
         from dev_auth import DEV_ISSUER, get_public_key_body  # noqa: PLC0415
@@ -142,7 +142,7 @@ def apply_local_env(env: dict[str, str], *, use_keycloak: bool, use_redis: bool)
 
 
 API_SERVICES = [
-    {"name": "monolith-service", "dir": ROOT / "services" / "monolith", "port": 8000, "app": "main:app"},
+    {"name": "monolith-service", "dir": ROOT / "services" / "monolith", "port": 8001, "app": "main:app"},
 ]
 
 EVALUATION_SERVICE = {
@@ -321,9 +321,14 @@ def main() -> int:
             print(f"  Warning: could not flush Redis: {exc}")
 
     env      = load_root_env(use_keycloak=use_keycloak, use_redis=use_redis)
+
+    # Validate secrets after .env is loaded
+    from scripts.secrets_check import check_secrets
+    check_secrets(env)
+
     services = list(API_SERVICES)
 
-    pg_port = env.get("POSTGRES_PORT", "5432")
+    pg_port = env.get("POSTGRES_PORT", "5434")
     kc_port = env.get("KEYCLOAK_PORT", "8180")
     redis_port = env.get("REDIS_PORT", "6379")
     print(f"\n[2/3] Configuration")

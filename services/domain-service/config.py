@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     )
 
     # Database
-    DATABASE_URL: str = f"postgresql+asyncpg://postgres:postgres@localhost:{os.getenv('POSTGRES_PORT', '5432')}/domain_db"
+    DATABASE_URL: str = f"postgresql+asyncpg://postgres:postgres@localhost:{os.getenv('POSTGRES_PORT', '5434')}/domain_db"
 
     # Keycloak
     KEYCLOAK_ISSUER: str = f"http://localhost:{os.getenv('KEYCLOAK_PORT', '8180')}/realms/rag-system"

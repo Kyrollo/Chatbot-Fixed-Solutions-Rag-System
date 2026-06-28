@@ -9,8 +9,8 @@ class Settings(BaseSettings):
     )
 
     # Database
-    database_url: str = f"postgresql+asyncpg://postgres:postgres@localhost:{os.getenv('POSTGRES_PORT', '5432')}/domain_db"
-    sync_database_url: str = f"postgresql://postgres:postgres@localhost:{os.getenv('POSTGRES_PORT', '5432')}/domain_db"
+    database_url: str = f"postgresql+asyncpg://postgres:55555@localhost:{os.getenv('POSTGRES_PORT', '5434')}/domain_db"
+    sync_database_url: str = f"postgresql://postgres:55555@localhost:{os.getenv('POSTGRES_PORT', '5434')}/domain_db"
 
     # Redis
     redis_url: str = f"redis://localhost:{os.getenv('REDIS_PORT', '6379')}/0"

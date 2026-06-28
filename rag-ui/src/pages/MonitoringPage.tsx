@@ -1,6 +1,6 @@
 // src/pages/MonitoringPage.tsx
 import { useEffect, useState } from 'react'
-import { Server, Database, Cpu, HardDrive, RefreshCw, BarChart2, ShieldAlert, Download, Trash2, ExternalLink, AlertTriangle, Activity } from 'lucide-react'
+import { Server, Database, Cpu, HardDrive, RefreshCw, BarChart2, ShieldAlert, Download, Trash2 } from 'lucide-react'
 import { healthApi, monitoringApi } from '../lib/api'
 import { useAuthStore } from '../store/authStore'
 import { cn } from '../lib/utils'
@@ -12,38 +12,32 @@ const SERVICES = [
   { label: 'Evaluation Service', path: '/evaluate' },
 ]
 
-// ── External monitoring URLs ──────────────────────────────────────────────────
-const GRAFANA_DASHBOARDS = [
-  {
-    label: 'Service Health',
-    description: 'Request rate, error rate, and latency per service',
-    url: 'http://localhost:3000/d/rag-service-health',
-    color: 'text-emerald-400',
-    bg: 'bg-emerald-500/10 border-emerald-500/20',
-  },
-  {
-    label: 'Evaluation Quality',
-    description: 'Judge scores, eval latency, and failure rate',
-    url: 'http://localhost:3000/d/rag-eval-quality',
-    color: 'text-violet-400',
-    bg: 'bg-violet-500/10 border-violet-500/20',
-  },
-  {
-    label: 'Infra Overview',
-    description: 'Celery workers, task throughput, and 24h totals',
-    url: 'http://localhost:3000/d/rag-infra-overview',
-    color: 'text-sky-400',
-    bg: 'bg-sky-500/10 border-sky-500/20',
-  },
-]
-
 interface Metrics {
-  queue: { depth: number; active_workers: number }
-  retrieval: { vector_latency_ms: number; bm25_latency_ms: number; avg_fusion_score: number }
-  cache: { hits: number; max_memory?: number; misses: number; memory_mb: number }
-  llm: { api_requests: number; local_requests: number }
+  queue: {
+    depth: number
+    active_workers: number
+  }
+  retrieval: {
+    vector_latency_ms: number
+    bm25_latency_ms: number
+    avg_fusion_score: number
+  }
+  cache: {
+    hits: number
+    max_memory?: number
+    misses: number
+    memory_mb: number
+  }
+  llm: {
+    api_requests: number
+    local_requests: number
+  }
   services: Record<string, string>
-  documents: { total: number; processing: number; failed: number }
+  documents: {
+    total: number
+    processing: number
+    failed: number
+  }
 }
 
 export default function MonitoringPage() {
@@ -52,32 +46,8 @@ export default function MonitoringPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null)
   const [metricsLoading, setMetricsLoading] = useState(false)
   const [metricsError, setMetricsError] = useState('')
-  const [prometheusUp, setPrometheusUp] = useState<boolean | null>(null)
-  const [alertsCount, setAlertsCount] = useState<number | null>(null)
 
-  // Check if Prometheus is reachable
-  async function checkPrometheus() {
-    try {
-      const res = await fetch('http://localhost:9091/-/healthy', { signal: AbortSignal.timeout(3000) })
-      setPrometheusUp(res.ok)
-    } catch {
-      setPrometheusUp(false)
-    }
-  }
-
-  // Check Alertmanager for firing alerts
-  async function checkAlerts() {
-    try {
-      const res = await fetch('http://localhost:9093/api/v2/alerts?active=true', { signal: AbortSignal.timeout(3000) })
-      if (res.ok) {
-        const data = await res.json()
-        setAlertsCount(Array.isArray(data) ? data.length : 0)
-      }
-    } catch {
-      setAlertsCount(null)
-    }
-  }
-
+  // 1. Basic Health Check for Services
   async function checkHealth() {
     const results: Record<string, boolean> = {}
     for (const s of SERVICES) {
@@ -86,6 +56,7 @@ export default function MonitoringPage() {
     setStatuses(results)
   }
 
+  // 2. Fetch Detailed Metrics (requires system_admin)
   async function fetchMetrics() {
     if (!isSystemAdmin) return
     setMetricsError('')
@@ -112,11 +83,11 @@ export default function MonitoringPage() {
   }
 
   async function resetMetrics() {
-    if (!window.confirm('Are you sure you want to reset all monitoring metrics?')) return
+    if (!window.confirm("Are you sure you want to reset all monitoring metrics? This will clear Redis latency caches and LLM distributions.")) return
     setMetricsLoading(true)
     try {
       await monitoringApi.reset()
-      alert('Metrics reset successfully.')
+      alert("Metrics reset successfully.")
       await fetchMetrics()
     } catch (err: any) {
       alert(`Reset failed: ${err.message}`)
@@ -127,10 +98,7 @@ export default function MonitoringPage() {
 
   useEffect(() => {
     checkHealth()
-    checkPrometheus()
-    checkAlerts()
     const healthInterval = setInterval(checkHealth, 15000)
-    const promInterval = setInterval(() => { checkPrometheus(); checkAlerts() }, 30000)
 
     if (isSystemAdmin) {
       setMetricsLoading(true)
@@ -139,13 +107,11 @@ export default function MonitoringPage() {
       return () => {
         clearInterval(healthInterval)
         clearInterval(metricsInterval)
-        clearInterval(promInterval)
       }
     }
 
     return () => {
       clearInterval(healthInterval)
-      clearInterval(promInterval)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSystemAdmin])
@@ -184,8 +150,6 @@ export default function MonitoringPage() {
           <button
             onClick={async () => {
               checkHealth()
-              checkPrometheus()
-              checkAlerts()
               if (isSystemAdmin) {
                 setMetricsLoading(true)
                 await fetchMetrics().finally(() => setMetricsLoading(false))
@@ -193,15 +157,15 @@ export default function MonitoringPage() {
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card/50 hover:bg-card text-xs transition"
           >
-            <RefreshCw size={14} className={cn(metricsLoading && 'animate-spin')} /> Refresh
+            <RefreshCw size={14} className={cn(metricsLoading && 'animate-spin')} /> Manual Refresh
           </button>
         </div>
       </div>
 
-      {/* Service Health */}
+      {/* Basic Infrastructure Status */}
       <div className="glass rounded-xl p-5 border border-border">
         <h3 className="font-bold text-sm mb-4 flex items-center gap-2">
-          <Server size={16} className="text-primary" /> Gateway Status & Health Checks
+          <Server size={16} className="text-primary" /> Gateway Status & Health checks
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {SERVICES.map((s) => (
@@ -223,13 +187,14 @@ export default function MonitoringPage() {
           <div>
             <h4 className="text-sm font-semibold text-foreground">Elevated Privilege Required</h4>
             <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-              Infrastructure metrics and Grafana dashboards are restricted to System Administrators.
+              Infrastructure metrics (Celery queue depth, search latencies, redis cache memory, and document stats) are restricted to System Administrators.
+              Login with a System Admin account to view detailed analytics.
             </p>
           </div>
         </div>
       )}
 
-      {/* ── SYSTEM ADMIN ONLY SECTION ─────────────────────────────────────── */}
+      {/* Admin Metrics Dashboard */}
       {isSystemAdmin && (
         <>
           {metricsError && (
@@ -238,114 +203,6 @@ export default function MonitoringPage() {
             </div>
           )}
 
-          {/* ── Grafana Dashboards ── */}
-          <div className="glass rounded-xl p-5 border border-border space-y-4">
-            <div className="flex items-center justify-between border-b border-border/40 pb-3">
-              <h3 className="font-bold text-sm flex items-center gap-2">
-                <BarChart2 size={16} className="text-primary" /> Grafana Dashboards
-              </h3>
-              <div className="flex items-center gap-2">
-                <span className={cn(
-                  'flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full border',
-                  prometheusUp === true
-                    ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                    : prometheusUp === false
-                    ? 'text-red-400 bg-red-500/10 border-red-500/20'
-                    : 'text-muted-foreground bg-muted/20 border-border'
-                )}>
-                  <span className={cn('h-1.5 w-1.5 rounded-full', prometheusUp === true ? 'bg-emerald-500 animate-pulse' : prometheusUp === false ? 'bg-red-500' : 'bg-muted-foreground')} />
-                  Prometheus {prometheusUp === true ? 'UP' : prometheusUp === false ? 'DOWN' : 'Checking...'}
-                </span>
-                <a
-                  href="http://localhost:3000"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition px-2 py-0.5 rounded border border-border hover:bg-card"
-                >
-                  Open Grafana <ExternalLink size={11} />
-                </a>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {GRAFANA_DASHBOARDS.map((d) => (
-                <a
-                  key={d.label}
-                  href={d.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(
-                    'group flex flex-col gap-1.5 rounded-xl border p-4 transition hover:scale-[1.02] hover:shadow-md',
-                    d.bg
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className={cn('text-sm font-bold', d.color)}>{d.label}</span>
-                    <ExternalLink size={13} className={cn('opacity-0 group-hover:opacity-100 transition', d.color)} />
-                  </div>
-                  <span className="text-xs text-muted-foreground leading-relaxed">{d.description}</span>
-                </a>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Prometheus & Alertmanager ── */}
-          <div className="glass rounded-xl p-5 border border-border space-y-4">
-            <h3 className="font-bold text-sm flex items-center gap-2 border-b border-border/40 pb-3">
-              <Activity size={16} className="text-primary" /> Prometheus & Alertmanager
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Prometheus */}
-              <a
-                href="http://localhost:9091/targets"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex flex-col gap-2 rounded-xl border border-border p-4 bg-card/20 hover:bg-card/40 transition hover:scale-[1.01]"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-foreground">Prometheus</span>
-                  <ExternalLink size={13} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition" />
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={cn('h-2 w-2 rounded-full', prometheusUp === true ? 'bg-emerald-500 animate-pulse' : prometheusUp === false ? 'bg-red-500' : 'bg-muted-foreground')} />
-                  <span className="text-xs text-muted-foreground">
-                    {prometheusUp === true ? 'Scraping metrics every 15s — click to view targets' : prometheusUp === false ? 'Not reachable — is the monitoring stack running?' : 'Checking...'}
-                  </span>
-                </div>
-                <span className="text-[10px] text-muted-foreground/60 font-mono">localhost:9091</span>
-              </a>
-
-              {/* Alertmanager */}
-              <a
-                href="http://localhost:9093"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex flex-col gap-2 rounded-xl border border-border p-4 bg-card/20 hover:bg-card/40 transition hover:scale-[1.01]"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-foreground">Alertmanager</span>
-                  <ExternalLink size={13} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition" />
-                </div>
-                <div className="flex items-center gap-2">
-                  {alertsCount === null ? (
-                    <span className="text-xs text-muted-foreground">Could not reach Alertmanager</span>
-                  ) : alertsCount === 0 ? (
-                    <>
-                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                      <span className="text-xs text-emerald-400 font-semibold">No active alerts</span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertTriangle size={14} className="text-red-400" />
-                      <span className="text-xs text-red-400 font-semibold">{alertsCount} active alert{alertsCount > 1 ? 's' : ''} firing</span>
-                    </>
-                  )}
-                </div>
-                <span className="text-[10px] text-muted-foreground/60 font-mono">localhost:9093</span>
-              </a>
-            </div>
-          </div>
-
-          {/* ── Existing infra metrics ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Queue Monitor */}
             <div className="glass rounded-xl p-5 border border-border space-y-3">

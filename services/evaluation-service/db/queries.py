@@ -67,7 +67,7 @@ if not _raw_url:
     _password = quote(os.getenv("POSTGRES_PASSWORD", "postgres"), safe="")
     _db       = os.getenv("POSTGRES_DB", "domain_db")
     _host     = os.getenv("POSTGRES_HOST", "localhost")
-    _port     = os.getenv("POSTGRES_PORT", "5432")
+    _port     = os.getenv("POSTGRES_PORT", "5434")
     _raw_url  = f"postgresql://{_user}:{_password}@{_host}:{_port}/{_db}"
 DATABASE_URL = _raw_url.replace("postgresql+asyncpg://", "postgresql://")
 

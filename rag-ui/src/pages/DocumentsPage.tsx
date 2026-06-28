@@ -49,6 +49,7 @@ interface ChunkItem {
 type ViewMode = 'formatted' | 'json' | 'raw_db' | 'plain_text' | 'markdown_preview'
 
 export default function DocumentsPage() {
+  const seen = useRef(new Set<string>())
   const { domains, activeDomainId } = useDomainStore()
   const isSystemAdmin = useAuthStore((state) => state.isSystemAdmin)
   const activeDomain = domains.find((d) => d.id === activeDomainId)
@@ -101,44 +102,58 @@ export default function DocumentsPage() {
 
   // Set up polling for active documents
   const pollStatus = useCallback(
-    (id: string) => {
-      if (pollingIntervals.current[id]) return
+  (id: string) => {
+    if (!id || id.startsWith('temp-')) return
+    if (pollingIntervals.current[id]) return
 
-      const interval = window.setInterval(async () => {
-        try {
-          const res = await ingestApi.status(id)
-          setDocuments((prev) =>
-            prev.map((doc) =>
-              doc.id === id
-                ? { ...doc, status: res.status, error_msg: res.error_msg }
-                : doc
-            )
+    const interval = window.setInterval(async () => {
+      try {
+        const res = await ingestApi.status(id)
+
+        setDocuments((prev) =>
+          prev.map((doc) =>
+            doc.id === id
+              ? { ...doc, status: res.status, error_msg: res.error_msg }
+              : doc
           )
-          
-          if (res.status === 'done' || res.status === 'failed' || res.status === 'cancelled') {
-            clearInterval(pollingIntervals.current[id])
-            delete pollingIntervals.current[id]
-            // Refresh documents list to update chunk counts
-            fetchDocuments()
-          }
-        } catch (err) {
-          console.error(`Error polling status for ${id}:`, err)
-        }
-      }, 3000)
+        )
 
-      pollingIntervals.current[id] = interval
-    },
-    [fetchDocuments]
-  )
+        if (
+          res.status === 'done' ||
+          res.status === 'failed' ||
+          res.status === 'cancelled'
+        ) {
+          clearInterval(pollingIntervals.current[id])
+          delete pollingIntervals.current[id]
+
+          // مهم جدًا: تنظيف seen
+          seen.current.delete(id)
+
+          fetchDocuments()
+        }
+      } catch (err) {
+        console.error(`Error polling status for ${id}:`, err)
+      }
+    }, 3000)
+
+    pollingIntervals.current[id] = interval
+  },
+  [fetchDocuments]
+)
 
   // Start polling for existing pending/processing docs
   useEffect(() => {
-    documents.forEach((doc) => {
-      if (doc.status === 'pending' || doc.status === 'processing') {
-        pollStatus(doc.id)
-      }
-    })
-  }, [documents, pollStatus])
+  documents.forEach((doc) => {
+    if (
+      (doc.status === 'pending' || doc.status === 'processing') &&
+      !doc.id.startsWith('temp-') &&
+      !seen.current.has(doc.id)
+    ) {
+      seen.current.add(doc.id)
+      pollStatus(doc.id)
+    }
+  })
+}, [documents, pollStatus])
 
   // Handle file uploads
   async function handleFiles(files: FileList | null) {
@@ -159,7 +174,7 @@ export default function DocumentsPage() {
       }
 
       // Create a temporary local placeholder
-      const tempId = `temp-${Math.random()}`
+      const tempId = `temp-${crypto.randomUUID()}`
       const newDoc: DocumentItem = {
         id: tempId,
         domain_id: activeDomainId,

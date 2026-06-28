@@ -13,7 +13,7 @@ The gateway is now wired to the real `domain-service` for development.
 - `8080` Traefik dashboard
 - `8180` Keycloak
 - `8001` domain-service
-- `5432` PostgreSQL
+- `5434` PostgreSQL
 
 ## Run The Integrated Dev Stack
 

@@ -102,7 +102,7 @@ async def _wipe_postgresql(cfg: dict[str, str]) -> int:
     password = cfg.get("POSTGRES_PASSWORD", "postgres")
     password_quoted = quote(password, safe="")
     db = cfg.get("POSTGRES_DB", "domain_db")
-    port = cfg.get("POSTGRES_PORT", "5432")
+    port = cfg.get("POSTGRES_PORT", "5434")
     dsn = f"postgresql://{user}:{password_quoted}@localhost:{port}/{db}"
 
     try:

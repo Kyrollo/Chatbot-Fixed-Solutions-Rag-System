@@ -15,7 +15,7 @@ if not _raw_url:
     user = os.getenv("POSTGRES_USER", "postgres")
     password = quote(os.getenv("POSTGRES_PASSWORD", "postgres"), safe="")
     db = os.getenv("POSTGRES_DB", "domain_db")
-    _raw_url = f"postgresql://{user}:{password}@localhost:5432/{db}"
+    _raw_url = f"postgresql://{user}:{password}@localhost:5434/{db}"
 DATABASE_URL = _raw_url.replace("postgresql+asyncpg://", "postgresql://")
 
 engine = create_engine(DATABASE_URL)

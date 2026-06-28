@@ -1,7 +1,7 @@
 // src/lib/api.ts
 import { useAuthStore } from '../store/authStore'
 
-const BASE_URL = '' // proxied via vite/Traefik on same origin
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = useAuthStore.getState().token
