@@ -1,0 +1,58 @@
+{
+	admin localhost:2019
+}
+
+# ─── React UI ──────────────────────────────────────────────────────────────
+https://localhost:3000 {
+	root * rag-ui/dist
+	file_server
+	try_files {path} /index.html
+
+	log {
+		output file logs/caddy-ui.log
+	}
+}
+
+# ─── API Gateway ───────────────────────────────────────────────────────────
+https://localhost:8000 {
+
+	header {
+		Access-Control-Allow-Origin  "https://localhost:3000"
+		Access-Control-Allow-Headers "Authorization, Content-Type, X-Internal-Key"
+		Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+	}
+
+	route {
+		@options method OPTIONS
+		respond @options 204
+
+		handle /internal/* {
+			@not_loopback not remote_ip 127.0.0.1 ::1
+			abort @not_loopback
+			reverse_proxy localhost:8001
+		}
+
+		handle {
+			reverse_proxy localhost:8001
+		}
+	}
+
+	log {
+		output file logs/caddy-api.log
+	}
+}
+
+# ─── Keycloak ──────────────────────────────────────────────────────────────
+https://localhost:8443 {
+	reverse_proxy localhost:8180 {
+		header_up Host              {host}
+		header_up X-Real-IP         {remote_host}
+		header_up X-Forwarded-Proto https
+	}
+
+	log {
+		output file logs/caddy-keycloak.log
+	}
+}

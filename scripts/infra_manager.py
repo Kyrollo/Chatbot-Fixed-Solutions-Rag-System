@@ -254,9 +254,13 @@ def start_redis() -> subprocess.Popen:
 def start_keycloak() -> subprocess.Popen:
     home = ensure_keycloak_home()
     kc_port = get_keycloak_port()
+
     if keycloak_ready():
         print(f"  Keycloak already running on http://localhost:{kc_port}")
-        return subprocess.Popen(["cmd", "/c", "echo", "keycloak-already-running"], stdout=subprocess.DEVNULL)
+        return subprocess.Popen(
+            ["cmd", "/c", "echo", "keycloak-already-running"],
+            stdout=subprocess.DEVNULL,
+        )
 
     import_dir = home / "data" / "import"
     import_dir.mkdir(parents=True, exist_ok=True)
@@ -264,16 +268,33 @@ def start_keycloak() -> subprocess.Popen:
 
     if os.name == "nt":
         kc = home / "bin" / "kc.bat"
-        cmd = [str(kc), "start-dev", f"--http-port={kc_port}", "--import-realm"]
+        cmd = [
+            str(kc),
+            "start-dev",
+            f"--http-port={kc_port}",
+            "--hostname=https://localhost:8443",
+            "--proxy-headers=xforwarded",
+            "--http-enabled=true",
+            "--import-realm",
+        ]
     else:
         kc = home / "bin" / "kc.sh"
-        cmd = [str(kc), "start-dev", f"--http-port={kc_port}", "--import-realm"]
+        cmd = [
+            str(kc),
+            "start-dev",
+            f"--http-port={kc_port}",
+            "--hostname=https://localhost:8443",
+            "--proxy-headers=xforwarded",
+            "--http-enabled=true",
+            "--import-realm",
+        ]
 
     env = os.environ.copy()
     env["KC_BOOTSTRAP_ADMIN_USERNAME"] = "admin"
     env["KC_BOOTSTRAP_ADMIN_PASSWORD"] = "admin"
 
     print(f"  Starting Keycloak ({kc})...")
+
     return subprocess.Popen(
         cmd,
         cwd=home,

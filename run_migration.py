@@ -98,7 +98,7 @@ if __name__ == "__main__":
         password = quote(os.getenv("POSTGRES_PASSWORD", "postgres"), safe="")
         db = os.getenv("POSTGRES_DB", "domain_db")
         host = os.getenv("POSTGRES_HOST", "localhost")
-        port = os.getenv("POSTGRES_PORT", "5432")
+        port = os.getenv("POSTGRES_PORT", "5434")
         rel_url = f"postgresql://{user}:{password}@{host}:{port}/{db}"
         
     age_url = os.getenv("AGE_DATABASE_DSN")

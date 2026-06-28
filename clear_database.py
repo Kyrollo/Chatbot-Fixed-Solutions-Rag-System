@@ -95,7 +95,7 @@ if __name__ == "__main__":
         password = quote(os.getenv("POSTGRES_PASSWORD", "1234"), safe="")
         db = os.getenv("POSTGRES_DB", "domain_db")
         host = os.getenv("POSTGRES_HOST", "localhost")
-        port = os.getenv("POSTGRES_PORT", "5432")
+        port = os.getenv("POSTGRES_PORT", "5434")
         rel_url = f"postgresql://{user}:{password}@{host}:{port}/{db}"
     db_urls.append(rel_url)
     
@@ -127,6 +127,6 @@ if __name__ == "__main__":
     for url in unique_urls:
         # Extract port for display
         host_port = url.partition("@")[-1].partition("/")[0]
-        port = host_port.partition(":")[-1] if ":" in host_port else "5432"
+        port = host_port.partition(":")[-1] if ":" in host_port else "5434"
         run_sql_on_db(url, sql_content, f"Database on port {port}")
 

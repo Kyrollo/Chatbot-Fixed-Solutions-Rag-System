@@ -12,7 +12,7 @@ HOW TO RUN
 Run against a real PostgreSQL test database and a real Redis instance:
 
     # 1. Set environment variables (or copy .env.test)
-    export SYNC_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/eval_test"
+    export SYNC_DATABASE_URL="postgresql://postgres:postgres@localhost:5434/eval_test"
     export REDIS_URL="redis://localhost:6379/1"   # use DB 1 so you don't clobber your dev DB
 
     # 2. Install test dependencies
@@ -61,7 +61,7 @@ from db.models import (
 # Fixtures
 # ─────────────────────────────────────────────────────────────────────────────
 
-TEST_DB_URL = "postgresql://postgres:postgres@localhost:5432/eval_test"
+TEST_DB_URL = "postgresql://postgres:postgres@localhost:5434/eval_test"
 
 
 @pytest.fixture(scope="session")
