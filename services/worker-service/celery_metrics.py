@@ -25,6 +25,11 @@ METRICS_PORT  (default 9090) — port for the metrics HTTP server
 
 import time
 import os
+
+_MULTIPROC_DIR = os.getenv("PROMETHEUS_MULTIPROC_DIR")
+if _MULTIPROC_DIR:
+    os.makedirs(_MULTIPROC_DIR, exist_ok=True)
+
 from prometheus_client import (
     Counter,
     Histogram,

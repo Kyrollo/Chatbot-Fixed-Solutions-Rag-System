@@ -1,6 +1,6 @@
 =============================================================================
   LOAD TEST BASELINE METRICS
-  Captured: 2026-06-29 17:19:42 EDT
+  Captured: 2026-06-29 19:00:02 EDT
   Run BEFORE the Locust load test. Fill this file into load_test_infra_report.md
 =============================================================================
 
@@ -8,14 +8,14 @@
    Method: top -bn3 (3-sample average, non-interactive)
 
    /proc/stat snapshot (single-shot, less accurate):
-   cpu 19554374 0 19933560 50086280
+   cpu 23574029 0 23820967 66259655
 
 ## 2. MEMORY USAGE
    /proc/meminfo snapshot:
 MemTotal:        8260824 kB
-MemFree:         1686984 kB
-SwapTotal:      13301788 kB
-SwapFree:        8729584 kB
+MemFree:          532980 kB
+SwapTotal:      12065384 kB
+SwapFree:       11031872 kB
 
 ## 3. POSTGRESQL CONNECTIONS
    Host: localhost:5434   Database: domain_db
@@ -33,16 +33,16 @@ SwapFree:        8729584 kB
 ## 4. REDIS MEMORY
    Host: localhost:6379
 
-   Used Memory:          844.78K
+   Used Memory:          878.03K
    Peak Memory:          1.19M
    RSS (OS view):        0.77M
    Max Memory Limit:     0 (no limit)
    Eviction Policy:      N/A
-   Fragmentation Ratio:  0.93  (>1.5 = high fragmentation)
-   Total Keys (DBSIZE):  11
+   Fragmentation Ratio:  0.89  (>1.5 = high fragmentation)
+   Total Keys (DBSIZE):  4
 
 ## 5. SYSTEM LOAD AVERAGE
-   Load avg (1m / 5m / 15m): 0.00 0.00 0.00 1/2
+   Load avg (1m / 5m / 15m): 3.31 3.31 3.31 1/2
    CPU Cores:                4
 
 =============================================================================

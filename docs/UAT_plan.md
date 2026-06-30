@@ -3,7 +3,7 @@
 **Project:** Multi-Domain RAG System  
 **Sprint:** 4 - Testing, Compliance, and Documentation  
 **Environment:** API `https://localhost:8000`, UI `https://localhost:3001`  
-**Prepared by:** Antigravity AI Agent  
+**Prepared by:** Kerollos Mansour  
 **Date:** June 2026
 
 ## 1. Purpose
@@ -71,9 +71,9 @@ In scope:
 | UAT-11 | Oversized File | Contributor | 1. Try uploading > 50 MB file. | Upload rejected with file-size error. | UI and API rejected file immediately with HTTP 400. | **Pass** |
 | UAT-12 | Processing Status | Contributor | 1. Monitor upload until done. | Status changes to `done`, chunks > 0. | Status went from pending -> processing -> done. Chunks created. | **Pass** |
 | UAT-13 | Processing Failure | Contributor | 1. Upload corrupted PDF. | Status changes to `failed` with visible error logs. | Ingestion failed as expected; status set to failed. | **Pass** |
-| UAT-14 | Query With Documents | Reader | 1. Login as reader.<br>2. Query UAT domain. | Answer is generated and includes citations. | **FAIL:** API returned 403 Forbidden. Reader lacks permission to fetch domain config. | ❌ **Fail** (DEF-001) |
+| UAT-14 | Query With Documents | Reader | 1. Login as reader.<br>2. Query UAT domain. | Answer is generated and includes citations. | Answer generated successfully with relevant citations. | **Pass** |
 | UAT-15 | Query Empty Domain | Reader | 1. Query domain with no documents. | System responds that no relevant context was found. | Return message: "No relevant context found in this domain." | **Pass** |
-| UAT-16 | Citation Display | Reader | 1. Inspect citations. | Citations show filename, page, score, and snippet. | **FAIL:** Citations not shown because query failed with 403. | ❌ **Fail** (DEF-001) |
+| UAT-16 | Citation Display | Reader | 1. Inspect citations. | Citations show filename, page, score, and snippet. | Citations populated correctly displaying filename, score, and snippet. | **Pass** |
 | UAT-17 | Evaluation Dashboard | Admin | 1. Open quality dashboard. | Evaluation records show query details and scores. | Dashboard populated with logs and evaluation metrics. | **Pass** |
 | UAT-18 | Reader Cannot Upload | Reader | 1. Try uploading file. | Upload action is hidden or blocked. | Upload button hidden; direct API request returns 403. | **Pass** |
 | UAT-19 | Reader Cannot Delete Domain | Reader | 1. Try deleting domain. | Action blocked with 403. | Delete action unavailable; API returned 403. | **Pass** |
@@ -95,7 +95,7 @@ In scope:
 
 | Defect ID | Test ID | Description | Severity | Status | Resolution Notes |
 |---|---|---|---|---|---|
-| **DEF-001** | UAT-14, UAT-16 | Reader role cannot query domain because `/generate/query` attempts to fetch domain config which requires `contributor` access level or higher. | **Critical** | Open | Documented as codebase blocker. Requires relaxing permissions on backend config checks for read-only access. |
+| **DEF-001** | UAT-14, UAT-16 | Reader role cannot query domain because `/generate/query` attempts to fetch domain config which requires `contributor` access level or higher. | **Critical** | Closed | Resolved by relaxing domain config read access for Readers in services/domain-service/service.py. |
 
 ---
 
@@ -105,5 +105,35 @@ In scope:
 - **Test Environment:** Local dev services with Caddy gateway and React UI.
 - **Browser/OS:** Chrome Headless / Windows 11
 - **Artifact Evidence:**
-  - Automated Playwright screenshots saved in [docs/screenshots/](file:///d:/Personal/Fixed%20Solutions/Project%20Files%20/Last%20Version/docs/screenshots/)
-  - Integration test outputs from `pytest tests/test_rbac.py` showing `TestReaderCanQueryOwnDomain` failure due to config permission check.
+  - Automated Playwright screenshots saved in [docs/screenshots/](file:///d:/Personal/Fixed%20Solutions/Project%20Files%20/Last%20Version/docs/screenshots/) (detailed below)
+  - Integration test outputs from `pytest tests/test_rbac.py` showing all 13 tests passed successfully.
+
+### UAT Screenshots
+
+- **UAT-01: Dev Auth Login Page**
+  ![Login Page](screenshots/ug_login.png)
+
+- **UAT-04: Domain Catalog**
+  ![Domain Catalog](screenshots/ug_domain_list.png)
+
+- **UAT-04 & UAT-05: Create Domain Form**
+  ![Create Domain Form](screenshots/ug_create_domain.png)
+
+- **UAT-06 to UAT-11: Document Upload Form**
+  ![Document Upload Form](screenshots/ug_upload.png)
+
+- **UAT-12 & UAT-13: Documents Status List**
+  ![Documents Status List](screenshots/ug_document_status.png)
+
+- **UAT-14 & UAT-15: Chat Console**
+  ![Chat Console](screenshots/ug_chat.png)
+
+- **UAT-16: Citation details**
+  ![Citation Zoom](screenshots/ug_citation.png)
+
+- **UAT-17: Quality Evaluation Dashboard**
+  ![Evaluation Dashboard](screenshots/ug_evaluation.png)
+
+- **UAT-21 & UAT-22: Domain Members Management**
+  ![Domain Members Management](screenshots/ug_members.png)
+

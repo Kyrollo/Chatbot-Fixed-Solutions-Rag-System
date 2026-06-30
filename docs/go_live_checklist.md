@@ -2,7 +2,7 @@
 
 **Project:** Multi-Domain RAG System  
 **Target Date:** June 2026  
-**Prepared by:** Antigravity AI Agent  
+**Prepared by:** Kerollos Mansour  
 **Release Candidate:** v1.0.0-RC4  
 **Environment:** Staging / Local Development
 
@@ -61,7 +61,7 @@ Status values:
 | Status | Item | Verification / Evidence | Notes |
 |---|---|---|---|
 | **Done** | Authentication required on protected endpoints | Verified. Requests without token return 401. | |
-| **Failed** | RBAC tests pass | Run `pytest tests/test_rbac.py` manually. | 12 of 13 tests passed. `TestReaderCanQueryOwnDomain` failed due to DEF-001. |
+| **Done** | RBAC tests pass | Run `pytest tests/test_rbac.py` manually. | 13 of 13 tests passed successfully. Reader role can now query own domain. |
 | **Done** | Reader cannot upload | Verified. Upload button is hidden, API returns 403. | |
 | **Done** | Contributor cannot manage members | Verified. Members tab hidden, API returns 403. | |
 | **Done** | Non-member cannot access another domain | Verified. Cross-domain query returns 403. | |
@@ -120,7 +120,7 @@ Status values:
 
 | ID | Description | Required Fix | Status |
 |---|---|---|---|
-| **DEF-001** | Reader role unable to query own domain (config fetch permission failure). | Relax domain config read access for Readers on backend. | **Open** |
+| **DEF-001** | Reader role unable to query own domain (config fetch permission failure). | Relax domain config read access for Readers on backend. | **Closed** (Resolved) |
 
 ### Known Non-Blocking Risks
 

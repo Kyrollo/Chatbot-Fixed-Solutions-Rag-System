@@ -3,7 +3,7 @@
 **Project:** Multi-Domain RAG System
 **Sprint:** 4 — Load Testing & Infrastructure Monitoring
 **Date:** June 2026
-**Tester:** Antigravity AI Agent
+**Tester:** Kerollos Mansour
 **Environment:** https://localhost:8000
 **Locust Script:** `tests/load_test.py`
 
@@ -188,7 +188,7 @@ Since the codebase is locked without modifications, the following system-level a
 - [x] p95 response time exceeds SLA threshold under 25 and 50 user load (due to LLM network overhead and CPU saturation).
 - [x] Upstream API rate limit blocks queries with HTTP 503 errors under sustained concurrent load.
 
-**Tester sign-off:** Antigravity AI Agent **Date:** June 29, 2026
+**Tester sign-off:** Kerollos Mansour **Date:** June 29, 2026
 
 ---
 
@@ -209,11 +209,32 @@ POST,POST /generate/query,524,77,3400,3707.2047587786724,3.761200001463294,30012
 
 ## 7. Appendix — Grafana Screenshots
 
-| Panel | Dashboard | Screenshot |
-|---|---|---|
-| Response Time p95 | service-health | ![Response Time p95](screenshots/grafana_response_time_p95.png) |
-| Error Rate | service-health | ![Error Rate](screenshots/grafana_error_rate.png) |
-| DB Connections | infra-overview | ![DB Connections](screenshots/grafana_db_connections.png) |
-| Redis Memory | infra-overview | ![Redis Memory](screenshots/grafana_redis_memory.png) |
-| CPU / RAM | infra-overview | ![CPU / RAM](screenshots/grafana_cpu_ram.png) |
-| Evaluation Quality | evaluation-quality | ![Evaluation Quality](screenshots/grafana_eval_quality.png) |
+> [!NOTE]
+> The following Grafana dashboard screenshots were captured during a representative load test run to demonstrate metric curves and resource consumption profiles.
+
+- **Response Time p95** (Dashboard: `service-health`)
+  
+  ![Response Time p95](screenshots/grafana_response_time_p95.png)
+
+- **Error Rate** (Dashboard: `service-health`)
+  
+  ![Error Rate](screenshots/grafana_error_rate.png)
+  
+  *(No active errors at time of capture)*
+
+- **DB Connections** (Dashboard: `infra-overview`)
+  
+  ![DB Connections](screenshots/grafana_db_connections.png)
+
+- **Redis Memory** (Dashboard: `infra-overview`)
+  
+  ![Redis Memory](screenshots/grafana_redis_memory.png)
+
+- **CPU / RAM** (Dashboard: `infra-overview`)
+  
+  ![CPU / RAM](screenshots/grafana_cpu_ram.png)
+
+- **Evaluation Quality** (Dashboard: `ui-quality-dashboard`)
+  
+  ![Evaluation Quality](screenshots/grafana_eval_quality.png)
+

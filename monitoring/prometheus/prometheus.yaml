@@ -14,13 +14,13 @@ scrape_configs:
   # ── Monolith (domain + ingestion + retrieval + generation + evaluation) ──────
   - job_name: monolith-service
     static_configs:
-      - targets: ["host.docker.internal:8000"]
+      - targets: ["host.docker.internal:8001"]
     metrics_path: /metrics
 
   # ── Evaluation-service (standalone on 8005) ─────────────────────────────────
   - job_name: evaluation-service
     static_configs:
-      - targets: ["host.docker.internal:8005"]
+      - targets: ["host.docker.internal:8001"]
     metrics_path: /metrics
 
   # ── Celery worker (separate tiny HTTP server on port 9090) ──────────────────

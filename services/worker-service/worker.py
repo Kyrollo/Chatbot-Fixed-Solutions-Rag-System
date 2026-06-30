@@ -90,6 +90,14 @@ celery_app.conf.update(
     worker_gossip=False,                     # Disable peer-to-peer worker gossip to stop heartbeat checks
 )
 
+# --- Wire up Prometheus Metrics ---
+try:
+    from celery_metrics import setup_celery_metrics, start_metrics_server
+    setup_celery_metrics(celery_app)
+    start_metrics_server(port=int(os.getenv("METRICS_PORT", "9090")))
+except Exception as exc:
+    logger.warning("Could not start celery metrics server: %s", exc)
+
 
 # ------------------------------------------------------------------
 # OCR warm-up — runs once per worker process, before any task is

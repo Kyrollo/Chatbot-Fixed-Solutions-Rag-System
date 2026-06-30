@@ -43,7 +43,7 @@ export default function ChatPage() {
     const payload = {
       query: userMsg.content,
       domain_id: activeDomainId,
-      stream: true,
+      stream: false,
       top_k_retrieve: config?.top_k_retrieve ?? 10,
       top_k_rerank: config?.top_k_rerank ?? 5,
       temperature: config?.temperature ?? 0.2,
@@ -51,25 +51,11 @@ export default function ChatPage() {
     }
 
     try {
-      const stream = await generateApi.queryStream(payload)
-      const reader = stream.getReader()
-      const decoder = new TextDecoder()
-      let acc = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        acc += decoder.decode(value, { stream: true })
-        updateLastAssistant(activeDomainId, acc)
-      }
-    } catch (e) {
-      // Fallback to non-streaming for citations
-      try {
-        const res = await generateApi.query({ ...payload, stream: false })
-        updateLastAssistant(activeDomainId, res.answer)
-        setCitations(activeDomainId, assistantId, res.citations ?? [])
-      } catch (err) {
-        updateLastAssistant(activeDomainId, `⚠️ Error: ${(err as Error).message}`)
-      }
+      const res = await generateApi.query(payload)
+      updateLastAssistant(activeDomainId, res.answer)
+      setCitations(activeDomainId, assistantId, res.citations ?? [])
+    } catch (err) {
+      updateLastAssistant(activeDomainId, `⚠️ Error: ${(err as Error).message}`)
     } finally {
       setLoading(false)
     }
