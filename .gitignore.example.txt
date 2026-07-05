@@ -14,6 +14,8 @@ env/
 
 # ─── Environment & secrets ────────────────────────────────────────────────────
 .env
+.env.*
+*.env
 *.ini
 
 # ─── IDE / editor ─────────────────────────────────────────────────────────────
@@ -33,8 +35,9 @@ desktop.ini
 data/
 uploads/
 services/data/
+**/data/
 
-# ─── Tools (auto-downloaded infra binaries — Redis, Keycloak) ────────────────
+# ─── Tools (auto-downloaded infra binaries — Redis, Keycloak, Helm, Caddy) ───
 tools/
 
 # ─── Infra (large binary archives — Redis/Keycloak zips and extracts) ────────
@@ -45,6 +48,8 @@ scripts/fixtures/
 
 # ─── Logs ─────────────────────────────────────────────────────────────────────
 *.log
+logs/
+**/logs/
 
 # ─── Downloads & archives ────────────────────────────────────────────────────
 *.part
@@ -53,9 +58,10 @@ scripts/fixtures/
 # ─── React frontend (rag-ui) ─────────────────────────────────────────────────
 rag-ui/node_modules/
 rag-ui/dist/
+rag-ui/*.tsbuildinfo
 
 # ─── Gemini agent workspace ──────────────────────────────────────────────────
-.gemini/.history/
+.gemini/
 
 # Celery Beat
 celerybeat-schedule*
@@ -65,7 +71,6 @@ celerybeat-schedule*
 
 # Redis
 dump.rdb
-
 
 # Dev JWT key pair
 *.pem

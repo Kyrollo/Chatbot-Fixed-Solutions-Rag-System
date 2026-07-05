@@ -17,14 +17,9 @@ import os
 
 from celery import Celery
 from celery.schedules import crontab
-from pathlib import Path
 from dotenv import load_dotenv
 
-root_env = Path(__file__).resolve().parents[2] / ".env"
-if root_env.exists():
-    load_dotenv(root_env, override=False)
-else:
-    load_dotenv(override=False)
+load_dotenv(override=False)
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 

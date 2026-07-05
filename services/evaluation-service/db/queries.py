@@ -41,7 +41,6 @@ import os
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from pathlib import Path
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
@@ -58,11 +57,7 @@ from db.models import (
     context_cache_key,
 )
 
-root_env = Path(__file__).resolve().parents[3] / ".env"
-if root_env.exists():
-    load_dotenv(root_env)
-else:
-    load_dotenv()
+load_dotenv()
 
 # Same resolution order as worker-service/tasks/process.py
 _raw_url = os.getenv("SYNC_DATABASE_URL") or os.getenv("DATABASE_URL")
@@ -72,7 +67,7 @@ if not _raw_url:
     _password = quote(os.getenv("POSTGRES_PASSWORD", "postgres"), safe="")
     _db       = os.getenv("POSTGRES_DB", "domain_db")
     _host     = os.getenv("POSTGRES_HOST", "localhost")
-    _port     = os.getenv("POSTGRES_PORT", "5434")
+    _port     = os.getenv("POSTGRES_PORT", "5432")
     _raw_url  = f"postgresql://{_user}:{_password}@{_host}:{_port}/{_db}"
 DATABASE_URL = _raw_url.replace("postgresql+asyncpg://", "postgresql://")
 
