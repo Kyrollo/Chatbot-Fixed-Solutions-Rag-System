@@ -4,7 +4,7 @@
 }
 
 # ─── React UI ──────────────────────────────────────────────────────────────
-https://localhost:{$UI_PORT} {
+https://localhost:3001 {
 	root * rag-ui/dist
 	file_server
 	try_files {path} /index.html
@@ -15,10 +15,10 @@ https://localhost:{$UI_PORT} {
 }
 
 # ─── API Gateway ───────────────────────────────────────────────────────────
-https://localhost:{$GATEWAY_PORT} {
+https://localhost:8000 {
 
 	header {
-		Access-Control-Allow-Origin  "https://localhost:{$UI_PORT}"
+		Access-Control-Allow-Origin  "https://localhost:3001"
 		Access-Control-Allow-Headers "Authorization, Content-Type, X-Internal-Key"
 		Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
 		X-Content-Type-Options "nosniff"
@@ -32,11 +32,11 @@ https://localhost:{$GATEWAY_PORT} {
 		handle /internal/* {
 			@not_loopback not remote_ip 127.0.0.1 ::1
 			abort @not_loopback
-			reverse_proxy localhost:{$DOMAIN_SERVICE_PORT}
+			reverse_proxy localhost:8001
 		}
 
 		handle {
-			reverse_proxy localhost:{$DOMAIN_SERVICE_PORT}
+			reverse_proxy localhost:8001
 		}
 	}
 
@@ -46,8 +46,8 @@ https://localhost:{$GATEWAY_PORT} {
 }
 
 # ─── Keycloak ──────────────────────────────────────────────────────────────
-https://localhost:{$KEYCLOAK_GATEWAY_PORT} {
-	reverse_proxy localhost:{$KEYCLOAK_PORT} {
+https://localhost:8443 {
+	reverse_proxy localhost:8180 {
 		header_up Host              {host}
 		header_up X-Real-IP         {remote_host}
 		header_up X-Forwarded-Proto https
