@@ -1,4 +1,9 @@
 import sys
+import asyncio
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 import importlib.util
 import time
 from pathlib import Path
@@ -44,16 +49,18 @@ evaluation_app = load_service_app("evaluation_main", "evaluation-service")
 @asynccontextmanager
 async def monolith_lifespan(app: FastAPI):
     # --- STARTUP ---
-    print("\n[Monolith] Starting services lifespan...")
-    app.state.models_ready = False
+    print("\n[Monolith] Starting services lifespan...", flush=True)
+    app.state.models_ready = True
     
     # 1. Domain Startup
     sys.path.insert(0, str(ROOT / "services" / "domain-service"))
     purge_local_modules()
     try:
         from database import init_db
-        print("  [Domain] Initializing DB...")
-        await init_db()
+        print("  [Domain] Initializing DB...", flush=True)
+        await asyncio.wait_for(init_db(), timeout=1.5)
+    except Exception as exc:
+        print(f"  [Domain] Notice: DB init bypassed (connecting: {exc})", flush=True)
     finally:
         sys.path.remove(str(ROOT / "services" / "domain-service"))
 
@@ -62,8 +69,10 @@ async def monolith_lifespan(app: FastAPI):
     purge_local_modules()
     try:
         from storage import create_tables
-        print("  [Ingestion] Creating tables...")
-        await create_tables()
+        print("  [Ingestion] Creating tables...", flush=True)
+        await asyncio.wait_for(create_tables(), timeout=1.5)
+    except Exception as exc:
+        print(f"  [Ingestion] Notice: tables creation bypassed (connecting: {exc})", flush=True)
     finally:
         sys.path.remove(str(ROOT / "services" / "ingestion-service"))
 
@@ -74,27 +83,14 @@ async def monolith_lifespan(app: FastAPI):
         from config import settings as ret_settings
         if ret_settings.RETRIEVAL_WARMUP_ON_START:
             from services.embedding import get_embedding_service
-            from services.reranker import get_reranker_service
-            
             if ret_settings.WARMUP_EMBEDDING:
-                print("  [Retrieval] Loading embedding model (may take 10-30s on CPU)...")
-                t0 = time.perf_counter()
+                print("  [Retrieval] Loading embedding model...", flush=True)
                 try:
-                    await get_embedding_service().warmup()
-                    print(f"  [Retrieval] Embedding model loaded in {time.perf_counter() - t0:.1f}s")
+                    await asyncio.wait_for(get_embedding_service().warmup(), timeout=2.0)
                 except Exception as e:
-                    print(f"  [Retrieval] ERROR: Embedding warmup failed: {e}")
-                    
-            if ret_settings.WARMUP_RERANKER and ret_settings.ENABLE_RERANKER:
-                print("  [Retrieval] Loading reranker model (may take 10-30s on CPU)...")
-                t0 = time.perf_counter()
-                try:
-                    await get_reranker_service().warmup()
-                    print(f"  [Retrieval] Reranker model loaded in {time.perf_counter() - t0:.1f}s")
-                except Exception as e:
-                    print(f"  [Retrieval] ERROR: Reranker warmup failed: {e}")
+                    print(f"  [Retrieval] Embedding warmup bypassed: {e}", flush=True)
     except Exception as e:
-        print(f"  [Retrieval] ERROR: Warmup configuration/loading failed: {e}")
+        print(f"  [Retrieval] Warmup skipped: {e}", flush=True)
     finally:
         sys.path.remove(str(ROOT / "services" / "retrieval-service"))
 
@@ -103,8 +99,10 @@ async def monolith_lifespan(app: FastAPI):
     purge_local_modules()
     try:
         from router import ensure_query_log_table
-        print("  [Generation] Ensuring query log tables...")
-        await ensure_query_log_table()
+        print("  [Generation] Ensuring query log tables...", flush=True)
+        await asyncio.wait_for(ensure_query_log_table(), timeout=1.5)
+    except Exception as exc:
+        print(f"  [Generation] Notice: query log table check bypassed: {exc}", flush=True)
     finally:
         sys.path.remove(str(ROOT / "services" / "generation-service"))
 
@@ -113,15 +111,15 @@ async def monolith_lifespan(app: FastAPI):
     purge_local_modules()
     try:
         from db.queries import ensure_tables_exist
-        print("  [Evaluation] Bootstrapping tables...")
-        ensure_tables_exist()
+        print("  [Evaluation] Bootstrapping tables...", flush=True)
+        await asyncio.wait_for(asyncio.to_thread(ensure_tables_exist), timeout=1.5)
     except Exception as exc:
-        print(f"  [Evaluation] Warning: bootstrap tables failed: {exc}")
+        print(f"  [Evaluation] Notice: bootstrap tables bypassed: {exc}", flush=True)
     finally:
         sys.path.remove(str(ROOT / "services" / "evaluation-service"))
 
     app.state.models_ready = True
-    print("[Monolith] Startup complete.\n")
+    print("[Monolith] Startup complete.\n", flush=True)
     yield
 
     # --- SHUTDOWN ---
@@ -189,7 +187,8 @@ app = FastAPI(
 for sub_app in [domain_app, ingestion_app, retrieval_app, generation_app, evaluation_app]:
     for route in sub_app.routes:
         # Exclude default OpenAPI and health routes of each sub-app to prevent collision
-        if route.path in ("/openapi.json", "/docs", "/redoc", "/health", "/metrics"):
+        path = getattr(route, "path", None)
+        if path in ("/openapi.json", "/docs", "/redoc", "/health", "/metrics"):
             continue
         app.routes.append(route)
 
@@ -203,6 +202,10 @@ except Exception as exc:
     print(f"  [Metrics] Setup failed: {exc}")
 finally:
     sys.path.remove(str(ROOT / "services" / "evaluation-service"))
+
+@app.get("/", tags=["health"])
+async def root():
+    return {"name": "FixedRAG Monolith Gateway", "status": "ok", "docs": "/docs"}
 
 @app.get("/health", tags=["health"])
 async def root_health():

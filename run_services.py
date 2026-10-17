@@ -95,11 +95,11 @@ def apply_local_env(env: dict[str, str], *, use_keycloak: bool, use_redis: bool)
     gateway_port = out.get("GATEWAY_PORT", "8000")
     keycloak_gateway_port = out.get("KEYCLOAK_GATEWAY_PORT", "8443")
 
-    out["DOMAIN_SERVICE_URL"]     = f"https://localhost:{gateway_port}"
-    out["INGESTION_SERVICE_URL"]  = f"https://localhost:{gateway_port}"
-    out["RETRIEVAL_SERVICE_URL"]  = f"https://localhost:{gateway_port}"
-    out["GENERATION_SERVICE_URL"] = f"https://localhost:{gateway_port}"
-    out["EVALUATION_SERVICE_URL"] = f"https://localhost:{gateway_port}"
+    out["DOMAIN_SERVICE_URL"]     = f"http://localhost:{gateway_port}"
+    out["INGESTION_SERVICE_URL"]  = f"http://localhost:{gateway_port}"
+    out["RETRIEVAL_SERVICE_URL"]  = f"http://localhost:{gateway_port}"
+    out["GENERATION_SERVICE_URL"] = f"http://localhost:{gateway_port}"
+    out["EVALUATION_SERVICE_URL"] = f"http://localhost:{gateway_port}"
     out["OCR_SERVICE_URL"]        = "http://localhost:8006"
     out["UPLOAD_DIR"]             = str(ROOT / "data" / "uploads")
     out.setdefault("OLLAMA_BASE_URL", "http://localhost:11434/v1")

@@ -21,12 +21,12 @@ class Settings(BaseSettings):
 
     REDIS_URL: str = f"redis://localhost:{os.getenv('REDIS_PORT', '6379')}/0"
     DATABASE_URL: str = f"postgresql+asyncpg://postgres:55555@localhost:{os.getenv('POSTGRES_PORT', '5434')}/domain_db"
-    DOMAIN_SERVICE_URL: str = "http://localhost:8001"
+    DOMAIN_SERVICE_URL: str = os.getenv("DOMAIN_SERVICE_URL", "http://localhost:8012")
     INTERNAL_API_KEY: str = "rag-internal-dev-key-change-in-prod"
     SYSTEM_ADMIN_ROLE: str = "system_admin"
 
     # Retrieval service
-    RETRIEVAL_SERVICE_URL: str = "http://localhost:8003"
+    RETRIEVAL_SERVICE_URL: str = os.getenv("RETRIEVAL_SERVICE_URL", "http://localhost:8012")
     RETRIEVAL_TIMEOUT_SECONDS: int = 300
 
     KEYCLOAK_ISSUER: str = f"http://localhost:{os.getenv('KEYCLOAK_PORT', '8180')}/realms/rag-system"
@@ -37,7 +37,7 @@ class Settings(BaseSettings):
 
     GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_MODEL: str = "qwen/qwen3.8-27b"
 
     OLLAMA_BASE_URL: str = "http://localhost:11434/v1"
     OLLAMA_MODEL: str = "llama3.2:3b"
@@ -47,8 +47,8 @@ class Settings(BaseSettings):
     TOP_K_RERANK: int = 5
     DEFAULT_MAX_TOKENS: int = 512
     DEFAULT_TEMPERATURE: float = 0.2
-    EVALUATION_SERVICE_URL: str = "http://localhost:8005"
-    EVALUATE_ON_GENERATION: bool = True
+    EVALUATION_SERVICE_URL: str = os.getenv("EVALUATION_SERVICE_URL", "http://localhost:8012")
+    EVALUATE_ON_GENERATION: bool = False
     EVALUATE_SYNC: bool = False
     EVALUATION_TIMEOUT_SECONDS: int = 45
 

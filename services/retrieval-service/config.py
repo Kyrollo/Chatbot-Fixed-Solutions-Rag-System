@@ -42,8 +42,8 @@ class Settings(BaseSettings):
     RERANKER_KEEP_LOADED: bool = True
     RERANKER_IDLE_TIMEOUT_SECONDS: int = 1800
 
-    RETRIEVAL_WARMUP_ON_START: bool = True
-    WARMUP_EMBEDDING: bool = True
+    RETRIEVAL_WARMUP_ON_START: bool = False
+    WARMUP_EMBEDDING: bool = False
     WARMUP_RERANKER: bool = False
 
     # Auth / RBAC

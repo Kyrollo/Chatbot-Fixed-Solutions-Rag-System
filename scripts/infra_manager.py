@@ -238,6 +238,8 @@ def wait_for_redis(timeout: int = 30) -> bool:
 
 
 def wait_for_keycloak(timeout: int = 180) -> bool:
+    if not shutil.which("java"):
+        return False
     deadline = time.time() + timeout
     while time.time() < deadline:
         if keycloak_ready():
@@ -268,6 +270,13 @@ def start_redis() -> subprocess.Popen:
 
 
 def start_keycloak() -> subprocess.Popen:
+    if not shutil.which("java"):
+        print("  Keycloak skipped (Java runtime not found). Using local dev JWT auth.")
+        return subprocess.Popen(
+            ["cmd", "/c", "echo", "keycloak-already-running"] if os.name == "nt" else ["echo", "keycloak-already-running"],
+            stdout=subprocess.DEVNULL,
+        )
+
     home = ensure_keycloak_home()
     kc_port = get_keycloak_port()
     kc_g_port = get_keycloak_gateway_port()

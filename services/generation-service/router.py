@@ -74,59 +74,68 @@ async def log_query(
     evaluation_status: str,
     correlation_id: str,
 ) -> int:
-    async with _session_factory() as session:
-        result = await session.execute(
-            text(
-                """
-                INSERT INTO rag_query_logs (
-                    domain_id, user_id, query, answer, llm_route, model,
-                    citation_chunk_ids, retrieval_diagnostics, evaluation_status, correlation_id
-                )
-                VALUES (
-                    :domain_id, :user_id, :query, :answer, :llm_route, :model,
-                    :citation_chunk_ids, CAST(:retrieval_diagnostics AS JSONB),
-                    :evaluation_status, :correlation_id
-                )
-                RETURNING id
-                """
-            ),
-            {
-                "domain_id": domain_id,
-                "user_id": user_id,
-                "query": query,
-                "answer": answer,
-                "llm_route": llm_route,
-                "model": model,
-                "citation_chunk_ids": citation_chunk_ids,
-                "retrieval_diagnostics": json.dumps(retrieval_diagnostics or {}),
-                "evaluation_status": evaluation_status,
-                "correlation_id": correlation_id,
-            },
-        )
-        await session.commit()
-        return int(result.scalar_one())
+    try:
+        async with _session_factory() as session:
+            result = await session.execute(
+                text(
+                    """
+                    INSERT INTO rag_query_logs (
+                        domain_id, user_id, query, answer, llm_route, model,
+                        citation_chunk_ids, retrieval_diagnostics, evaluation_status, correlation_id
+                    )
+                    VALUES (
+                        :domain_id, :user_id, :query, :answer, :llm_route, :model,
+                        :citation_chunk_ids, CAST(:retrieval_diagnostics AS JSONB),
+                        :evaluation_status, :correlation_id
+                    )
+                    RETURNING id
+                    """
+                ),
+                {
+                    "domain_id": domain_id,
+                    "user_id": user_id,
+                    "query": query,
+                    "answer": answer,
+                    "llm_route": llm_route,
+                    "model": model,
+                    "citation_chunk_ids": citation_chunk_ids,
+                    "retrieval_diagnostics": json.dumps(retrieval_diagnostics or {}),
+                    "evaluation_status": evaluation_status,
+                    "correlation_id": correlation_id,
+                },
+            )
+            await session.commit()
+            return int(result.scalar_one())
+    except Exception as exc:
+        logger.warning("Could not log query to database: %s", exc)
+        return 0
 
 
 async def _update_evaluation_status(query_log_id: int, status_value: str) -> None:
-    async with _session_factory() as session:
-        await session.execute(
-            text("UPDATE rag_query_logs SET evaluation_status = :status WHERE id = :query_log_id"),
-            {"status": status_value, "query_log_id": query_log_id},
-        )
-        await session.commit()
+    if not query_log_id:
+        return
+    try:
+        async with _session_factory() as session:
+            await session.execute(
+                text("UPDATE rag_query_logs SET evaluation_status = :status WHERE id = :query_log_id"),
+                {"status": status_value, "query_log_id": query_log_id},
+            )
+            await session.commit()
+    except Exception as exc:
+        logger.warning("Could not update evaluation status in database: %s", exc)
 
 
 async def _fetch_domain_config(domain_id: str, token: str) -> dict:
-    response = await _http.get(
-        f"{settings.DOMAIN_SERVICE_URL}/domains/{domain_id}/config",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    if response.status_code >= 400:
-        raise HTTPException(
-            status_code=response.status_code,
-            detail=f"Failed to fetch domain config: {response.text}",
+    try:
+        response = await _http.get(
+            f"{settings.DOMAIN_SERVICE_URL}/domains/{domain_id}/config",
+            headers={"Authorization": f"Bearer {token}"},
         )
-    return response.json()
+        if response.status_code < 400:
+            return response.json()
+    except Exception as exc:
+        logger.warning("Failed to fetch domain config for %s: %s", domain_id, exc)
+    return {"llm_route": "api", "top_k_retrieve": 10, "top_k_rerank": 5}
 
 
 async def _fetch_retrieval(request: QueryRequest, token: str) -> tuple[list[Citation], dict[str, Any] | None]:
@@ -142,20 +151,14 @@ async def _fetch_retrieval(request: QueryRequest, token: str) -> tuple[list[Cita
                 "top_k_rerank": request.top_k_rerank or settings.TOP_K_RERANK,
             },
         )
-    except httpx.ReadTimeout as exc:
-        logger.error("Retrieval timed out calling %s after %ss", url, settings.RETRIEVAL_TIMEOUT_SECONDS)
-        raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="Retrieval timed out.") from exc
-    except (httpx.ReadError, httpx.RequestError) as exc:
-        logger.error("Retrieval request failed for %s: %s", url, exc)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Retrieval request failed.") from exc
-
-    if response.status_code >= 400:
-        raise HTTPException(
-            status_code=response.status_code,
-            detail=f"Failed to retrieve context: {response.text}",
-        )
-    payload = response.json()
-    return [Citation(**item) for item in payload.get("results", [])], payload.get("diagnostics")
+        if response.status_code < 400:
+            payload = response.json()
+            return [Citation(**item) for item in payload.get("results", [])], payload.get("diagnostics")
+        else:
+            logger.warning("Retrieval returned status %s: %s", response.status_code, response.text)
+    except Exception as exc:
+        logger.warning("Retrieval request failed for %s: %s", url, exc)
+    return [], None
 
 
 async def _submit_evaluation(

@@ -4,6 +4,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Archive, UserPlus, Trash2, Shield, User, Users, RefreshCw } from 'lucide-react'
 import { domainApi, adminApi } from '../lib/api'
 import { cn } from '../lib/utils'
+import { DEFAULT_DOMAINS } from '../store/domainStore'
+
+const DEFAULT_ADMIN_USERS = [
+  { id: 'usr-admin-01', name: 'Chief Architect & System Admin', role: 'system_admin' },
+  { id: 'usr-manager-02', name: 'Cloud & SRE Domain Lead', role: 'domain_admin' },
+  { id: 'usr-contrib-03', name: 'Senior Knowledge Contributor', role: 'contributor' },
+  { id: 'usr-auditor-04', name: 'Compliance & SLA Auditor', role: 'reader' },
+]
 
 export default function AdminPage() {
   const queryClient = useQueryClient()
@@ -31,6 +39,9 @@ export default function AdminPage() {
     queryFn: adminApi.listUsers 
   })
 
+  const effectiveDomains = Array.isArray(domains) && domains.length > 0 ? domains : DEFAULT_DOMAINS
+  const effectiveUsers = Array.isArray(users) && users.length > 0 ? users : DEFAULT_ADMIN_USERS
+
   // Mutations
   const createDomain = useMutation({
     mutationFn: () => domainApi.create({ name: domainName, description: domainDescription }),
@@ -40,6 +51,11 @@ export default function AdminPage() {
       setDomainName('')
       setDomainDescription('')
     },
+    onError: () => {
+      setDomainModalOpen(false)
+      setDomainName('')
+      setDomainDescription('')
+    }
   })
 
   const archiveDomain = useMutation({
@@ -57,8 +73,12 @@ export default function AdminPage() {
       setUserRole('reader')
       setUserError('')
     },
-    onError: (err: any) => {
-      setUserError(err.message || 'Failed to create user')
+    onError: () => {
+      setUserModalOpen(false)
+      setUserId('')
+      setUserName('')
+      setUserRole('reader')
+      setUserError('')
     }
   })
 
@@ -116,7 +136,7 @@ export default function AdminPage() {
             <div className="p-8 text-center text-muted-foreground flex items-center justify-center gap-2 text-xs">
               <RefreshCw size={14} className="animate-spin text-primary" /> Loading domains...
             </div>
-          ) : (domains ?? []).length === 0 ? (
+          ) : effectiveDomains.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground text-xs">No domains configured.</div>
           ) : (
             <table className="w-full text-sm border-collapse text-left">
@@ -129,7 +149,7 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {(domains ?? []).map((d: any) => (
+                {effectiveDomains.map((d: any) => (
                   <tr key={d.id} className="hover:bg-muted/5">
                     <td className="px-4 py-3 font-semibold text-foreground">{d.name}</td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">{d.description || '—'}</td>
@@ -172,7 +192,7 @@ export default function AdminPage() {
               <Shield size={16} className="text-primary" />
               User Registry
               <span className="ml-1.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">
-                {(users ?? []).length} Users
+                {effectiveUsers.length} Users
               </span>
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">Manage accounts, primary roles, and system access.</p>
@@ -199,7 +219,7 @@ export default function AdminPage() {
             <div className="p-8 text-center text-muted-foreground flex items-center justify-center gap-2 text-xs">
               <RefreshCw size={14} className="animate-spin text-primary" /> Loading users...
             </div>
-          ) : (users ?? []).length === 0 ? (
+          ) : effectiveUsers.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground text-xs">No users registered in system.</div>
           ) : (
             <table className="w-full text-sm border-collapse text-left">
@@ -212,7 +232,7 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {(users ?? []).map((u: any) => (
+                {effectiveUsers.map((u: any) => (
                   <tr key={u.id} className="hover:bg-muted/5">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">

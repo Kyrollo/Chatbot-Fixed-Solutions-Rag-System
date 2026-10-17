@@ -6,6 +6,34 @@ A complete backend + frontend stack for domain management, document ingestion, h
 
 ---
 
+## 🎬 Live Demonstration & Real Interface
+
+[![Watch Video Demo](docs/assets/screenshots/01_hero_dashboard.png)](docs/assets/demo.mp4)
+
+> 📹 **High-Definition 1080p MP4 Demo Recording**: [`docs/assets/demo.mp4`](docs/assets/demo.mp4)
+
+### 📸 Visual Feature Gallery
+
+| 1. Streamed AI Response & Verified Citations | 2. Live Document Ingestion & Chunk Inspector |
+|:---:|:---:|
+| ![AI Response](docs/assets/screenshots/01_tab_fixedrag_chat.png) | ![Knowledge Base](docs/assets/screenshots/03_tab_knowledge_base.png) |
+| **3. Service Telemetry & Infra Analytics** | **4. Judge LLM Quality & Moderation Drawer** |
+| ![Telemetry Analytics](docs/assets/screenshots/06_tab_telemetry_infra.png) | ![Quality Judge](docs/assets/screenshots/07_tab_judge_quality.png) |
+| **5. FastAPI Monolith Swagger Docs (port 8012)** | **6. Grafana Operational Dashboards (port 3000)** |
+| ![FastAPI Swagger](docs/assets/screenshots/09_service_fastapi_swagger_docs.png) | ![Grafana Dashboards](docs/assets/screenshots/11_service_grafana_dashboard_ui.png) |
+
+---
+
+### ⚡ 1-Click Launch (Windows Standalone)
+
+Run the included standalone launcher to boot all services and launch the browser immediately:
+
+```bat
+.\run.bat
+```
+
+---
+
 ## Table of Contents
 
 1. [Project Overview](#1-project-overview)

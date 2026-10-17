@@ -11,6 +11,7 @@ import AdminPage from './pages/AdminPage'
 import MonitoringPage from './pages/MonitoringPage'
 import QualityPage from './pages/QualityPage'
 import LogsPage from './pages/LogsPage'
+import FineTunePage from './pages/FineTunePage'
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = useAuthStore((s) => s.token)
@@ -57,6 +58,14 @@ export default function App() {
           element={
             <RequireRole roles={['system_admin', 'domain_admin', 'contributor']}>
               <DocumentsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="fine-tune"
+          element={
+            <RequireRole roles={['system_admin', 'domain_admin']}>
+              <FineTunePage />
             </RequireRole>
           }
         />

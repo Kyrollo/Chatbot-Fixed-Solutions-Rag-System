@@ -12,6 +12,7 @@ export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const setDomains = useDomainStore((s) => s.setDomains)
   const logout = useAuthStore((s) => s.logout)
+  const isDemo = useAuthStore((s) => s.isDemo)
   const navigate = useNavigate()
 
   const { data, error } = useQuery({
@@ -21,21 +22,23 @@ export default function AppLayout() {
   })
 
   useEffect(() => {
-    if (error) {
+    if (error && !isDemo) {
       const msg = (error as Error).message ?? ''
       if (msg.includes('401') || msg.includes('403')) {
         logout()
         navigate('/login', { replace: true })
       }
     }
-  }, [error, logout, navigate])
+  }, [error, isDemo, logout, navigate])
 
   useEffect(() => {
-    if (Array.isArray(data)) setDomains(data)
+    if (Array.isArray(data) && data.length > 0) {
+      setDomains(data)
+    }
   }, [data, setDomains])
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background text-foreground">
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
       <div className="flex-1 flex flex-col min-w-0">
         <Header />
