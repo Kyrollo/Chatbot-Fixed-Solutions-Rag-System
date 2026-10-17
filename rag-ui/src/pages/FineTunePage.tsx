@@ -149,7 +149,7 @@ export default function FineTunePage() {
                 FixedRAG Fine-Tune Studio
               </h1>
               <p className="text-xs text-slate-400 mt-0.5">
-                Curate instruction datasets from ingested technical solutions and export QLoRA weights for local RTX A5000 fine-tuning
+                Curate instruction datasets from ingested technical solutions and export QLoRA weights for local Dedicated NVIDIA GPU fine-tuning
               </p>
             </div>
           </div>
